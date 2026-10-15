@@ -1461,10 +1461,15 @@ let retrySpelling = false;
 let resultHoldUntil=0,resultHoldTimer,lastAnimatedAnswerId=null;
 function protectAnswerResult(correct) {
   clearTimeout(resultHoldTimer);
-  resultHoldUntil=Date.now()+(correct?650:1000);
   const button=$('submit-answer');
+  if(correct){
+    resultHoldUntil=0;
+    button?.removeAttribute('aria-disabled');
+    return;
+  }
+  resultHoldUntil=Date.now()+1000;
   button?.setAttribute('aria-disabled','true');
-  resultHoldTimer=setTimeout(()=>{if(button?.isConnected)button.removeAttribute('aria-disabled');},correct?650:1000);
+  resultHoldTimer=setTimeout(()=>{if(button?.isConnected)button.removeAttribute('aria-disabled');},1000);
 }
 function animateAnswerResult(correct) {
   const frame=document.querySelector('#answer-form .inline-answer-frame');
