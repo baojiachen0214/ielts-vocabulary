@@ -414,7 +414,7 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 
 /* The answer is the visual anchor. Reserve result space so grading never moves it. */
 .compact-zen .zen-top{height:68px}
-.compact-zen .zen-center{max-width:520px;width:100%;padding:24px 0 30px;margin:auto}
+.compact-zen .zen-center{max-width:520px;width:100%;padding:24px 0 30px;margin:clamp(28px,9vh,96px) auto auto}
 .compact-zen .zen-answer-form{max-width:none;width:100%}
 .compact-zen .practice-answer-top{display:grid;grid-template-columns:60px minmax(0,1fr) 60px;align-items:center;min-height:42px;margin-bottom:8px}
 .compact-zen .answer-word-label{grid-column:2;min-height:42px;display:flex;align-items:center;justify-content:center;gap:8px;margin:0;font-size:12px;font-weight:400;color:#8b9786;line-height:1.5;text-align:center}
@@ -429,7 +429,7 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 .compact-zen .inline-answer{font-size:32px;font-weight:550}
 .compact-zen .inline-answer-frame.answer-ok{background:#fbfdf9;border-color:#b2cbb5}
 .compact-zen .inline-answer-frame.answer-wrong{background:#fffafa;border-color:#d8b2ab}
-.compact-zen .answer-meaning{min-height:49px;padding:12px 3px 0;text-align:center;font-size:17px;color:#4d6146;line-height:1.65;overflow-wrap:anywhere}
+.compact-zen .answer-meaning{min-height:49px;padding:12px 3px 0;text-align:center;font-size:23px;color:#40563b;line-height:1.55;overflow-wrap:anywhere}
 .compact-zen .zen-answer-form .inline-feedback{height:27px;font-size:11px;white-space:normal;line-height:1.6;text-align:center;gap:10px}
 .compact-zen .practice-command-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:44px;margin-top:14px}
 .compact-zen .zen-answer-form .zen-submit{width:120px;flex:none;min-height:42px!important;height:42px;margin:0;padding:9px 16px;border-radius:6px;background:#41563d;box-shadow:none;font-size:13px;font-weight:500;gap:13px}
@@ -442,13 +442,15 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 .compact-zen .practice-sources summary{font-size:10px;color:#98a38e;font-weight:400}
 .compact-zen .zen-status{height:auto;min-height:0;max-width:100%;margin:14px 0 0;line-height:1.7;font-size:11px;white-space:normal;color:#a27461;text-align:center}
 .compact-zen .zen-footer{padding:16px 0 22px;gap:30px;font-size:10px;color:#a3ad9c}
-.compact-zen .letter-error{text-decoration:none;color:#b94f50;font-weight:600}
+.compact-zen .letter-error{color:#c17b35;text-decoration:line-through;text-decoration-thickness:2px;font-weight:550}.compact-zen .letter-missing{color:#b66a22;text-decoration:underline;text-underline-offset:5px;background:#fff0db;border-radius:3px}
 .compact-zen .empty-spelling{font-size:17px;font-weight:400;color:#a0817d}
-.compact-zen .result-success-motion{animation:answer-confirm .5s ease-out}
-.compact-zen .result-error-motion{animation:answer-correct .38s ease-in-out}
-@keyframes answer-confirm{0%{box-shadow:0 0 0 0 #70ab7940;background:#e7f5e8}50%{box-shadow:0 0 0 7px #70ab7915}100%{box-shadow:0 0 0 0 transparent}}
-@keyframes answer-correct{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}65%{transform:translateX(-2px)}85%{transform:translateX(2px)}}
-@media(max-width:700px){.compact-zen .zen-top{height:60px}.compact-zen .zen-center{padding:20px 0;max-width:480px}.compact-zen .inline-answer-frame{height:74px}.compact-zen #answer-input.zen-input,.compact-zen .inline-answer{font-size:28px!important}.compact-zen .answer-meaning{font-size:16px}.compact-zen .practice-command-row{gap:12px}.compact-zen .zen-answer-form .zen-submit{width:112px}.compact-zen .zen-footer{gap:20px;padding-bottom:18px}}
+.compact-zen .answer-verdict-slot{height:72px;display:flex;align-items:flex-start;justify-content:center;margin-bottom:8px}
+.compact-zen .answer-verdict{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#38865c;color:#fff}
+.compact-zen .answer-verdict.is-wrong{background:#c95754}
+.compact-zen .answer-verdict svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.compact-zen .answer-verdict[hidden]{display:none}
+.compact-zen .inline-feedback:empty{height:8px}
+@media(max-width:700px){.compact-zen .zen-top{height:60px}.compact-zen .zen-center{padding:20px 0;max-width:480px}.compact-zen .inline-answer-frame{height:74px}.compact-zen #answer-input.zen-input,.compact-zen .inline-answer{font-size:28px!important}.compact-zen .answer-meaning{font-size:21px}.compact-zen .practice-command-row{gap:12px}.compact-zen .zen-answer-form .zen-submit{width:112px}.compact-zen .zen-footer{gap:20px;padding-bottom:18px}}
 @media(prefers-reduced-motion:reduce){.compact-zen .result-success-motion,.compact-zen .result-error-motion{animation:none!important}}
 </style>
 </head>
@@ -1472,15 +1474,21 @@ function protectAnswerResult(correct) {
   resultHoldTimer=setTimeout(()=>{if(button?.isConnected)button.removeAttribute('aria-disabled');},1000);
 }
 function animateAnswerResult(correct) {
-  const frame=document.querySelector('#answer-form .inline-answer-frame');
-  frame?.classList.remove('result-success-motion','result-error-motion');
-  if(frame){void frame.offsetWidth;frame.classList.add(correct?'result-success-motion':'result-error-motion');}
+  const badge=$('answer-verdict');
+  if(!badge)return;
+  badge.hidden=false;
+  badge.classList.toggle('is-wrong',!correct);
+  badge.setAttribute('aria-label',correct?'回答正确':'回答错误');
+  badge.innerHTML=correct?'<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m7 16 6 6 12-13"/></svg>':'<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 9 14 14M23 9 9 23"/></svg>';
 }
 
 function inlineLetterDiff(input,target) {
-  // Show only what was typed; never interleave inserted answer letters or strikeouts.
   if(!input)return '<span class="empty-spelling">未作答</span>';
-  return diffChars(input,target).ops.filter(op=>op.a).map(op=>`<span class="${op.type==='same'?'letter-same':'letter-error'}">${escapeHTML(op.a)}</span>`).join('');
+  return diffChars(input,target).ops.map(op=>{
+    if(op.type==='same')return `<span class="letter-same">${escapeHTML(op.a)}</span>`;
+    if(op.type==='missing')return `<ins class="letter-missing" title="漏写的字母">${escapeHTML(op.b)}</ins>`;
+    return `<del class="letter-error" title="${op.type==='extra'?'多写的字母':'写错的字母'}">${escapeHTML(op.a)}</del>`;
+  }).join('');
 }
 function showInlineResult(answer,event,w) {
   const display=$('inline-answer');
@@ -1511,6 +1519,7 @@ renderPractice = function() {
     <div class="zen-progress"><div style="width:${Math.round(session.index/session.items.length*100)}%"></div></div>
     <div class="zen-center">
       <form id="answer-form" class="zen-answer-form">
+        <div class="answer-verdict-slot"><div id="answer-verdict" class="answer-verdict" role="img" hidden></div></div>
         <div class="practice-answer-top">
           <label class="zen-input-label answer-word-label" for="answer-input">${answered?(answered.correct?'<span class="sr-only">你的拼写</span>':'<span class="original-label">原词</span><strong id="canonical-answer">'+escapeHTML(w.w)+'</strong>'):'你的拼写'}</label>
           <button class="zen-play" type="button" data-action="play-current" aria-label="播放单词发音，Shift 或空格重听" title="Shift / 空格：重听">${speakerSVG}<span>${data.settings.autoPlay?'重听':'播放'}</span></button>
@@ -1561,12 +1570,13 @@ renderFeedback = function(event,w) {
     animateAnswerResult(event.correct);protectAnswerResult(event.correct);
   }
 
-  const base=event.correct?event.assisted?'已答对 · 使用过提示':'✓ 拼写正确':'拼写有误 · 对照上方原词';
-  $('feedback-area').innerHTML=`<span class="inline-result-msg ${event.correct?'result-good':'result-bad'}">${base}</span>${!event.correct?'<span class="inline-result-secondary">已保留在错词档案</span>':''}`;
+  animateAnswerResult(event.correct);
+  $('feedback-area').textContent='';
 };
 correction = function() {
   if(!data.session?.answered || data.session.answered.correct) return;
   retrySpelling=true;
+  $('answer-verdict').hidden=true;
   clearTimeout(resultHoldTimer);resultHoldUntil=0;$('submit-answer').removeAttribute('aria-disabled');
   if($('canonical-answer'))$('canonical-answer').hidden=true;
   document.querySelector('.answer-word-label .original-label')?.setAttribute('hidden','');
@@ -1598,7 +1608,7 @@ checkCorrection = function() {
   input.classList.remove('retry-error');input.classList.add('is-answered');input.readOnly=true;
   document.querySelector('#answer-form .inline-answer-frame').className='inline-answer-frame answer-ok';
   animateAnswerResult(true);
-  $('feedback-area').innerHTML='<span class="result-good">✓ 订正正确 · 原首答记录不变</span>';
+  $('feedback-area').textContent='';
   $('submit-answer').innerHTML='下一词 <span>↵</span>';
   $('practice-minor-actions').innerHTML=`<button type="button" class="zen-quiet" data-detail="${escapeHTML(target.id)}">查看词条</button>`;
   $('submit-answer').focus({preventScroll:true});
