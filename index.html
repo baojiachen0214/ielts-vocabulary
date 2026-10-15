@@ -412,21 +412,43 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 .compact-zen .practice-sources ul{list-style:none;padding:10px 12px;margin:8px 0 0;max-height:170px;overflow:auto;background:#f1f4ed;border-radius:4px;text-align:left;line-height:1.9}
 @media(max-width:600px){.library-name{gap:12px}.library-name>span{font-size:10px}.library-row{grid-template-columns:14px minmax(110px,1fr) 35px 75px;gap:8px}.library-row-track{display:none}.library-row{grid-template-columns:14px minmax(110px,1fr) 75px}}
 
-.compact-zen .answer-word-label{min-height:35px;display:flex;align-items:center;gap:12px;margin-bottom:9px}
-.compact-zen .answer-word-label strong{font-size:25px;font-weight:600;letter-spacing:.025em;color:#294c37;line-height:1.4;overflow-wrap:anywhere}
-.compact-zen .original-label{font-size:11px;color:#869481;flex:none}
-.compact-zen .answer-meaning{min-height:45px;padding:11px 4px 0;text-align:center;font-size:18px;color:#39513d;line-height:1.6;overflow-wrap:anywhere}
-.compact-zen .zen-answer-form .inline-feedback{height:31px;font-size:11px;white-space:normal;line-height:1.6;text-align:center}
-.compact-zen .zen-answer-form .zen-submit{margin-top:10px}
-.compact-zen .zen-submit[aria-disabled="true"]{opacity:.68;cursor:default}
-.compact-zen .practice-sources{margin-top:15px}
+/* The answer is the visual anchor. Reserve result space so grading never moves it. */
+.compact-zen .zen-top{height:68px}
+.compact-zen .zen-center{max-width:520px;width:100%;padding:24px 0 30px;margin:auto}
+.compact-zen .zen-answer-form{max-width:none;width:100%}
+.compact-zen .practice-answer-top{display:grid;grid-template-columns:60px minmax(0,1fr) 60px;align-items:center;min-height:42px;margin-bottom:8px}
+.compact-zen .answer-word-label{grid-column:2;min-height:42px;display:flex;align-items:center;justify-content:center;gap:8px;margin:0;font-size:12px;font-weight:400;color:#8b9786;line-height:1.5;text-align:center}
+.compact-zen .answer-word-label strong{font-size:22px;font-weight:550;letter-spacing:.015em;color:#304d36;overflow-wrap:anywhere}
+.compact-zen .original-label{font-size:10px;color:#939e8d;flex:none}
+.compact-zen .zen-play{grid-column:3;display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;min-width:0;min-height:32px;margin:0;padding:5px 3px;background:transparent;border:0;border-radius:4px;font-size:11px;font-weight:400;color:#82917a;box-shadow:none}
+.compact-zen .zen-play svg{width:17px;height:17px;flex:none}
+.compact-zen .zen-play:hover{background:#edf2e9;color:#47633d;transform:none}
+.compact-zen .inline-answer-frame{height:82px;border-radius:8px;border-width:1px;box-shadow:none;background:#fff}
+.compact-zen .inline-answer-frame:focus-within{border-color:#8ba27e;box-shadow:0 0 0 2px #edf2e7}
+.compact-zen #answer-input.zen-input{font-size:32px!important;font-weight:500!important}
+.compact-zen .inline-answer{font-size:32px;font-weight:550}
+.compact-zen .inline-answer-frame.answer-ok{background:#fbfdf9;border-color:#b2cbb5}
+.compact-zen .inline-answer-frame.answer-wrong{background:#fffafa;border-color:#d8b2ab}
+.compact-zen .answer-meaning{min-height:49px;padding:12px 3px 0;text-align:center;font-size:17px;color:#4d6146;line-height:1.65;overflow-wrap:anywhere}
+.compact-zen .zen-answer-form .inline-feedback{height:27px;font-size:11px;white-space:normal;line-height:1.6;text-align:center;gap:10px}
+.compact-zen .practice-command-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:44px;margin-top:14px}
+.compact-zen .zen-answer-form .zen-submit{width:120px;flex:none;min-height:42px!important;height:42px;margin:0;padding:9px 16px;border-radius:6px;background:#41563d;box-shadow:none;font-size:13px;font-weight:500;gap:13px}
+.compact-zen .zen-submit:hover{background:#35492f}
+.compact-zen .zen-submit:focus-visible{outline:2px solid #9bad91;outline-offset:3px}
+.compact-zen .zen-submit[aria-disabled="true"]{opacity:.65;cursor:default}
+.compact-zen .zen-minor-actions{min-height:0;height:auto;margin:0;gap:12px;justify-content:flex-start;flex-wrap:wrap}
+.compact-zen .zen-quiet{font-size:11px;font-weight:400;padding:5px 0;color:#8a9781}
+.compact-zen .practice-sources{margin:19px auto 0;color:#9aa58f}
+.compact-zen .practice-sources summary{font-size:10px;color:#98a38e;font-weight:400}
+.compact-zen .zen-status{height:auto;min-height:0;max-width:100%;margin:14px 0 0;line-height:1.7;font-size:11px;white-space:normal;color:#a27461;text-align:center}
+.compact-zen .zen-footer{padding:16px 0 22px;gap:30px;font-size:10px;color:#a3ad9c}
 .compact-zen .letter-error{text-decoration:none;color:#b94f50;font-weight:600}
 .compact-zen .empty-spelling{font-size:17px;font-weight:400;color:#a0817d}
 .compact-zen .result-success-motion{animation:answer-confirm .5s ease-out}
 .compact-zen .result-error-motion{animation:answer-correct .38s ease-in-out}
 @keyframes answer-confirm{0%{box-shadow:0 0 0 0 #70ab7940;background:#e7f5e8}50%{box-shadow:0 0 0 7px #70ab7915}100%{box-shadow:0 0 0 0 transparent}}
 @keyframes answer-correct{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}65%{transform:translateX(-2px)}85%{transform:translateX(2px)}}
-@media(max-width:700px){.compact-zen .answer-meaning{font-size:16px}.compact-zen .answer-word-label strong{font-size:23px}}
+@media(max-width:700px){.compact-zen .zen-top{height:60px}.compact-zen .zen-center{padding:20px 0;max-width:480px}.compact-zen .inline-answer-frame{height:74px}.compact-zen #answer-input.zen-input,.compact-zen .inline-answer{font-size:28px!important}.compact-zen .answer-meaning{font-size:16px}.compact-zen .practice-command-row{gap:12px}.compact-zen .zen-answer-form .zen-submit{width:112px}.compact-zen .zen-footer{gap:20px;padding-bottom:18px}}
 @media(prefers-reduced-motion:reduce){.compact-zen .result-success-motion,.compact-zen .result-error-motion{animation:none!important}}
 </style>
 </head>
@@ -1222,7 +1244,7 @@ function stopAudio() {
   if(currentAudio){currentAudio.pause();try{currentAudio.currentTime=0;}catch{}currentAudio=null;}
 }
 
-function audioStatus(message) { if($('audio-status'))$('audio-status').textContent=message;if($('voice-status'))$('voice-status').textContent=message; }
+function audioStatus(message,attention=false) { const status=$('audio-status');if(status){status.textContent=message;status.hidden=!attention;}if($('voice-status'))$('voice-status').textContent=message; }
 function safeHTTPS(value) { try {const u=new URL(typeof value==='string'&&value.startsWith('//')?'https:'+value:value);return u.protocol==='https:'?u.href:null;}catch{return null;} }
 async function dictionaryAudio(word,accent,signal) {
   const key=norm(word)+'|'+accent;
@@ -1261,7 +1283,7 @@ async function azureAudio(word,signal,profile=audioProfile()) {
 async function playWord(word) {
   stopAudio();const seq=audioSequence;
   const entry=prepareAudio(word,audioProfile());
-  if(!entry.ready)audioStatus('正在加载发音…');
+  if(!entry.ready)audioStatus('正在加载发音…',true);
   let timer;
   try {
     const prepared=entry.audio&&!entry.cancelled?entry:await entry.available;
@@ -1270,7 +1292,7 @@ async function playWord(word) {
     const audio=entry.audio;currentAudio=audio;
     audio.playbackRate=data.settings.rate;audio.preservesPitch=true;audio.webkitPreservesPitch=true;
     try{audio.currentTime=0;}catch{}
-    audio.onerror=()=>{if(seq===audioSequence)audioStatus('音频暂时无法播放，请重听或稍后重试。');};
+    audio.onerror=()=>{if(seq===audioSequence)audioStatus('音频暂时无法播放，请重听或稍后重试。',true);};
     const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('发音加载超时')),15000);});
     await Promise.race([Promise.resolve(audio.play()),timeout]);
     if(seq!==audioSequence)return;
@@ -1279,10 +1301,10 @@ async function playWord(word) {
   } catch(error) {
     if(seq!==audioSequence)return;
     if(error.name==='NotAllowedError') {
-      audioStatus('点击播放按钮，即可开始播放。');return;
+      audioStatus('点击播放按钮，即可开始播放。',true);return;
     }
     discardPreparedAudio(entry);
-    audioStatus((entry.error?.message||error.message)+'，请重听或稍后重试。');
+    audioStatus((entry.error?.message||error.message)+'，请重听或稍后重试。',true);
   } finally {
     clearTimeout(timer);pumpAudioPreloads();
   }
@@ -1479,31 +1501,31 @@ renderPractice = function() {
     <div class="zen-top">
       <button class="zen-back" data-action="pause" aria-label="保存进度并退出">← <span>返回</span></button>
       <div class="zen-progress-meta"><span>${spell?'拼写复习':'听写训练'}</span><span>${session.index+1}<i>/</i>${session.items.length}</span></div>
-      <button class="zen-audio-settings" data-action="open-audio-settings">发音设置 ↗</button>
+      <button class="zen-audio-settings" data-action="open-audio-settings">发音设置</button>
     </div>
     <div class="zen-progress"><div style="width:${Math.round(session.index/session.items.length*100)}%"></div></div>
     <div class="zen-center">
-      <div class="zen-eyebrow">${spell?'专注拼写':'单词听写'}</div>
-      <h1 class="zen-question" id="practice-meaning" aria-live="polite">听音拼写</h1>
-      <div class="zen-audio-block">
-        <button class="zen-play" type="button" data-action="play-current" aria-label="播放单词发音，Shift 或空格重听" title="Shift / 空格：重听发音">${speakerSVG}<span>播放发音</span><kbd>Shift</kbd></button>
-        <div id="audio-status" class="zen-status" role="status" aria-live="polite">${data.settings.provider==='youdao'?'有道词典 · ':''}按 Shift 或空格重听</div>
-      </div>
       <form id="answer-form" class="zen-answer-form">
-        <label class="zen-input-label answer-word-label" for="answer-input">${answered?'<span class="original-label">原词</span><strong id="canonical-answer">'+escapeHTML(w.w)+'</strong>':'你的拼写'}</label>
+        <div class="practice-answer-top">
+          <label class="zen-input-label answer-word-label" for="answer-input">${answered?(answered.correct?'<span class="sr-only">你的拼写</span>':'<span class="original-label">原词</span><strong id="canonical-answer">'+escapeHTML(w.w)+'</strong>'):'你的拼写'}</label>
+          <button class="zen-play" type="button" data-action="play-current" aria-label="播放单词发音，Shift 或空格重听" title="Shift / 空格：重听">${speakerSVG}<span>${data.settings.autoPlay?'重听':'播放'}</span></button>
+        </div>
         <div class="inline-answer-frame ${answered?(answered.correct?'answer-ok':'answer-wrong'):''}">
           <input id="answer-input" class="spell-input zen-input ${answered?'is-answered':''}" type="text" maxlength="150" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" aria-label="输入你听到的英文单词" placeholder="输入英文单词" value="${escapeHTML(session.draft)}" ${answered?'readonly':''}>
           <div id="inline-answer" class="inline-answer" ${answered?'':'hidden'} aria-live="polite"></div>
         </div>
         <div id="answer-meaning" class="answer-meaning" aria-live="polite">${answered?escapeHTML(w.m||'暂无中文释义'):''}</div>
         <div id="feedback-area" class="inline-feedback" role="status" aria-live="polite"></div>
-        <button type="submit" class="zen-submit" id="submit-answer">${answered?'下一个单词 <span>→</span>':'确认拼写 <span>↵</span>'}</button>
+        <div class="practice-command-row">
+          <div class="zen-minor-actions" id="practice-minor-actions">
+            ${answered?`<button type="button" class="zen-quiet" data-detail="${escapeHTML(w.id)}">词条</button>${!answered.correct?'<button type="button" class="zen-quiet" data-action="correction">重新拼写</button>':''}`:
+              '<button type="button" class="zen-quiet" data-action="hint">首字母提示</button><button type="button" class="zen-quiet" data-action="dont-know">暂时不会</button>'}
+          </div>
+          <button type="submit" class="zen-submit" id="submit-answer">${answered?'下一词':'确认'} <span>↵</span></button>
+        </div>
       </form>
+      <div id="audio-status" class="zen-status" role="status" aria-live="polite" hidden></div>
       ${practiceSources(w)}
-      <div class="zen-minor-actions" id="practice-minor-actions">
-        ${answered?`<button type="button" class="zen-quiet" data-detail="${escapeHTML(w.id)}">查看词条</button>${!answered.correct?'<span class="zen-separator">·</span><button type="button" class="zen-quiet" data-action="correction">重新拼写</button>':''}`:
-          '<button type="button" class="zen-quiet" data-action="hint">首字母提示</button><span class="zen-separator">·</span><button type="button" class="zen-quiet" data-action="dont-know">暂时不会</button>'}
-      </div>
       <div id="hint-status" hidden></div><div id="hint-content" hidden></div>
     </div>
     <div class="zen-footer"><span><kbd>Enter</kbd> ${answered?'下一题':'提交'}</span><span><kbd>Shift</kbd> / <kbd>空格</kbd> 重听</span><span>进度自动保存</span></div>
@@ -1542,6 +1564,7 @@ correction = function() {
   retrySpelling=true;
   clearTimeout(resultHoldTimer);resultHoldUntil=0;$('submit-answer').removeAttribute('aria-disabled');
   if($('canonical-answer'))$('canonical-answer').hidden=true;
+  document.querySelector('.answer-word-label .original-label')?.setAttribute('hidden','');
   const input=$('answer-input'),form=$('answer-form');
   const result=$('inline-answer');
   if(result) result.hidden=true;
@@ -1562,7 +1585,7 @@ checkCorrection = function() {
   }
   retrySpelling=false;
   const target=currentWord();
-  if($('canonical-answer'))$('canonical-answer').hidden=false;
+  document.querySelector('.answer-word-label').innerHTML='<span class="sr-only">你的拼写</span>';
   protectAnswerResult(true);
   $('inline-answer').hidden=false;
   $('inline-answer').innerHTML=escapeHTML(input.value);
