@@ -1571,8 +1571,8 @@ correction = function() {
   input.readOnly=false;input.classList.remove('is-answered');input.value='';
   form.querySelector('.inline-answer-frame').className='inline-answer-frame';
   $('submit-answer').innerHTML='检查订正 <span>↵</span>';
-  $('feedback-area').textContent='遮住答案，再独立拼写一次（首答成绩保持不变）';
-  $('practice-minor-actions').innerHTML='<button type="button" class="zen-quiet" data-action="play-current">重听发音</button>';
+  $('feedback-area').textContent='再写一次，首答成绩保留。';
+  $('practice-minor-actions').innerHTML='';
   input.focus({preventScroll:true});
 };
 checkCorrection = function() {
@@ -1594,7 +1594,7 @@ checkCorrection = function() {
   document.querySelector('#answer-form .inline-answer-frame').className='inline-answer-frame answer-ok';
   animateAnswerResult(true);
   $('feedback-area').innerHTML='<span class="result-good">✓ 订正正确 · 原首答记录不变</span>';
-  $('submit-answer').innerHTML='下一个单词 <span>→</span>';
+  $('submit-answer').innerHTML='下一词 <span>↵</span>';
   $('practice-minor-actions').innerHTML=`<button type="button" class="zen-quiet" data-detail="${escapeHTML(target.id)}">查看词条</button>`;
   $('submit-answer').focus({preventScroll:true});
 };
