@@ -557,7 +557,8 @@ const ORIGINAL_UNIQUE = records.size;
 const ORIGINAL_COUNT = Object.values(WORDS_DATA).reduce((n, list) => n + list.length, 0);
 const spellingPairs = [['colour','color'],['colours','colors'],['centre','center'],['theatre','theater'],['neighbour','neighbor'],['neighbours','neighbors'],['labour','labor'],['behaviour','behavior'],['behaviours','behaviors'],['flavour','flavor'],['grey','gray'],['humour','humor'],['tyre','tire'],['tyres','tires'],['mould','mold'],['socialise','socialize'],['practice','practise'],['litre','liter'],['harbour','harbor'],['fertiliser','fertilizer'],['fertilisers','fertilizers']];
 let storageProblem = '', corruptStore = false, lastSaved = '', view = 'dashboard', chartMode = 'all';
-let wrongFilter = {search:'', status:'active', sort:'errors', page:0};
+let wrongFilter = {search:'', status:'active', sort:'errors', day:'pending', limit:20, page:0};
+let repeatReviewDone=new Set();
 let practiceStarted = 0, inputTimer, toastTimer, currentAudio, audioSequence = 0, shiftPending = false;
 let azureKey = '', batchRunning = false, stopBatch = false, lastBatchRequest = 0;
 const inMemoryAudio = new Map(), dictionaryMemory = new Map();
@@ -772,7 +773,7 @@ function emptyTrack() { return {correct:0,wrong:0,assisted:0,total:0,stage:0,due
 function allStats() {
   const perWord = new Map();
   function get(id) {
-    if (!perWord.has(id)) perWord.set(id,{id,legacyWrong:int(data.legacy.wrongBook[id]?.count),everWrong:Object.hasOwn(data.legacy.wrongBook,id),listen:emptyTrack(),spell:emptyTrack(),last:0,errors:0});
+    if (!perWord.has(id)) perWord.set(id,{id,legacyWrong:int(data.legacy.wrongBook[id]?.count),everWrong:Object.hasOwn(data.legacy.wrongBook,id),listen:emptyTrack(),spell:emptyTrack(),last:0,lastWrong:0,errors:0});
     return perWord.get(id);
   }
   for (const id of Object.keys(data.legacy.wrongBook)) get(id);
@@ -790,7 +791,7 @@ function allStats() {
         const d=new Date(e.ts); d.setDate(d.getDate()+INTERVALS[t.stage-1]); t.due=d.getTime();
       }
     } else {
-      t.wrong++; m.wrong++; w.everWrong=true; w.errors++; t.stage=0; t.due=e.ts+10*60000;
+      t.wrong++; m.wrong++; w.everWrong=true; w.errors++; w.lastWrong=Math.max(w.lastWrong,e.ts); t.stage=0; t.due=e.ts+10*60000;
     }
     if (e.mode === 'listen') for (const key of e.setKeys) if (progress[key]) progress[key].add(id);
   }
@@ -935,9 +936,26 @@ function renderDashboard() {
   update();
 }
 
-function reviewControls(scope='active') {
-  return `<div hidden>${Object.keys(WORDS_DATA).map(key=>`<input type="checkbox" name="practice-set" value="${escapeHTML(key)}" checked>`).join('')}<select name="practice-scope"><option value="${scope}">${scope}</option></select><select name="practice-limit"><option value="20">20</option></select><select name="practice-order"><option value="priority">错次优先</option></select></div>`;
+function reviewedToday() {
+  const day=localDay();
+  return new Set(data.attempts.filter(e=>e.mode==='spell'&&(e.localDay||localDay(e.ts))===day).map(e=>norm(e.word)));
 }
+function reviewCandidates(stats=allStats(),applyDay=true) {
+  let rows=stats.wrongWords.filter(w=>records.has(w.id));
+  if(wrongFilter.status==='active')rows=rows.filter(w=>!data.wordFlags[w.id]?.archived&&(w.listen.stage<3||w.spell.stage<3));
+  if(wrongFilter.status==='due')rows=rows.filter(w=>!data.wordFlags[w.id]?.archived&&w.spell.due<=Date.now());
+  if(wrongFilter.status==='archived')rows=rows.filter(w=>data.wordFlags[w.id]?.archived);
+  const search=norm(wrongFilter.search);
+  if(search)rows=rows.filter(w=>w.id.includes(search)||String(records.get(w.id)?.m||'').includes(search));
+  if(applyDay){const today=reviewedToday();rows=rows.filter(w=>wrongFilter.day==='done'?today.has(w.id)&&!repeatReviewDone.has(w.id):!today.has(w.id));}
+  rows.sort((a,b)=>wrongFilter.sort==='recent'?b.lastWrong-a.lastWrong||a.id.localeCompare(b.id):
+    (b.errors+b.legacyWrong)-(a.errors+a.legacyWrong)||b.lastWrong-a.lastWrong||a.id.localeCompare(b.id));
+  return rows;
+}
+function reviewControls(scope='active') {
+  return `<div class="mistake-controls"><select id="review-order" name="practice-order" aria-label="复习顺序">${[['priority','错次最多优先'],['recent','最近答错优先'],['random','随机顺序']].map(([v,t])=>`<option value="${v}" ${(wrongFilter.sort==='errors'?'priority':wrongFilter.sort)===v?'selected':''}>${t}</option>`).join('')}</select><select id="review-day" aria-label="当天复习范围"><option value="pending" ${wrongFilter.day==='pending'?'selected':''}>今天未复习</option><option value="done" ${wrongFilter.day==='done'?'selected':''}>今天已复习 · 重练</option></select><select id="review-limit" name="practice-limit" aria-label="每组词数">${[[20,'每组 20 词'],[50,'每组 50 词'],[0,'全部剩余词']].map(([v,t])=>`<option value="${v}" ${wrongFilter.limit===v?'selected':''}>${t}</option>`).join('')}</select></div><div hidden>${Object.keys(WORDS_DATA).map(key=>`<input type="checkbox" name="practice-set" value="${escapeHTML(key)}" checked>`).join('')}<select name="practice-scope"><option value="${scope}">${scope}</option></select></div>`;
+}
+
 function renderSetup(mode) {
   if(mode==='listen'){showView('dashboard');return;}
   showView('wrong');
@@ -966,11 +984,13 @@ function startPractice(mode,singleId=null) {
     if(scope==='wrong'||scope==='due')return ws?.everWrong&&!data.wordFlags[w.id]?.archived&&(scope!=='due'||ws[mode].due<=Date.now());
     return true;
   });
-  if(!singleId&&view==='wrong'&&norm(wrongFilter.search)){const search=norm(wrongFilter.search);list=list.filter(w=>w.id.includes(search)||String(w.m||'').includes(search));}
+  if(!singleId&&view==='wrong'&&mode==='spell')list=reviewCandidates(s).filter(w=>!data.wordFlags[w.id]?.archived).map(w=>records.get(w.id));
   if(order==='random')for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}
+  else if(order==='recent')list.sort((a,b)=>(s.perWord.get(b.id)?.lastWrong||0)-(s.perWord.get(a.id)?.lastWrong||0)||a.id.localeCompare(b.id));
   else if(scope==='active'||scope==='wrong'||scope==='due'||mode==='spell')list.sort((a,b)=>{const x=s.perWord.get(a.id),y=s.perWord.get(b.id);return ((y?.legacyWrong||0)+(y?.errors||0))-((x?.legacyWrong||0)+(x?.errors||0));});
   if(mode==='listen'&&bank&&order==='priority')list.sort((a,b)=>bankFrequency(b,bank)-bankFrequency(a,bank)||a.id.localeCompare(b.id,'en'));
   if(limit)list=list.slice(0,limit);
+  if(!list.length&&view==='wrong'){toast(wrongFilter.day==='done'?'今天还没有复习过的错词。':'这个范围今天已复习完，可切换到「今天已复习 · 重练」。');return;}
   if(!list.length){toast(scope==='due'?'暂时没有到期错词，可以改选「全部错词」。':'这个范围已经练完了，试试其他词库或选择「全部单词」。');return;}
   if(data.session&&data.session.index<data.session.items.length&&!confirm('还有未完成的练习。开始新一组会替换当前草稿，已提交的成绩会保留。继续吗？'))return;
   data.session={id:uid(),mode,items:list.map(w=>({word:w.id,setKeys:w.sets.filter(k=>keys.includes(k))})),index:0,answered:null,draft:'',assisted:false,createdAt:Date.now(),updatedAt:Date.now()};
@@ -1028,7 +1048,7 @@ function submitAnswer(dontKnow=false) {
   if(!norm(input)&&!dontKnow){toast('请输入单词，或选择「暂时不会」。');return;}
   const correct=!dontKnow&&isRight(input,w.w);
   const event={id:uid(),sessionId:session.id,ts:Date.now(),localDay:localDay(),word:w.id,mode:session.mode,input,correct,assisted:session.assisted===true,type:correct?'正确':(dontKnow?'未作答':errorType(input,w.w)),ms:Math.min(Date.now()-practiceStarted,3600000),setKeys:session.items[session.index].setKeys};
-  data.attempts.push(event);session.draft=input;session.answered=event;session.updatedAt=Date.now();
+  data.attempts.push(event);if(session.mode==='spell'&&wrongFilter.day==='done')repeatReviewDone.add(w.id);session.draft=input;session.answered=event;session.updatedAt=Date.now();
   if(!correct&&data.wordFlags[w.id]?.archived)data.wordFlags[w.id]={archived:false,updatedAt:Date.now()};
   persist();renderPractice();
   $('submit-answer').focus();
@@ -1063,28 +1083,28 @@ function renderSessionEnd() {
   const session=data.session,events=data.attempts.filter(e=>e.sessionId===session.id);
   const correct=events.filter(e=>e.correct&&!e.assisted).length,assisted=events.filter(e=>e.correct&&e.assisted).length;
   const wrong=events.filter(e=>!e.correct);
-  $('view-practice').innerHTML=`<div class="session-end"><h1>本组完成</h1><p>答对 ${correct} / ${events.length}${assisted?' · 提示后答对 '+assisted:''}${wrong.length?' · 答错 '+wrong.length:''}</p><div class="btn-row"><button class="btn primary" data-view="dashboard">返回词库</button>${wrong.length?'<button class="btn" data-view="wrong">复习错词</button>':''}</div>${wrong.length?`<div class="end-words"><p>本组错词</p><div class="btn-row">${wrong.map(e=>`<button class="btn small" data-detail="${escapeHTML(e.word)}">${escapeHTML(records.get(e.word)?.w||e.word)}</button>`).join('')}</div></div>`:''}</div>`;
+  const remaining=session.mode==='spell'?reviewCandidates().filter(w=>!data.wordFlags[w.id]?.archived).length:0;
+  $('view-practice').innerHTML=`<div class="session-end"><h1>本组完成</h1><p>答对 ${correct} / ${events.length}${assisted?' · 提示后答对 '+assisted:''}${wrong.length?' · 答错 '+wrong.length:''}</p><div class="btn-row">${session.mode==='spell'?`<button class="btn primary" data-action="review-next">${remaining?'继续下一组 · 剩 '+remaining+' 词':'返回复习列表'}</button>`:''}<button class="btn" data-view="dashboard">返回词库</button>${wrong.length?'<button class="btn" data-view="wrong">复习错词</button>':''}</div>${wrong.length?`<div class="end-words"><p>本组错词</p><div class="btn-row">${wrong.map(e=>`<button class="btn small" data-detail="${escapeHTML(e.word)}">${escapeHTML(records.get(e.word)?.w||e.word)}</button>`).join('')}</div></div>`:''}</div>`;
 }
 
 function renderWrong() {
-  const s=allStats();let rows=s.wrongWords;
+  const s=allStats(),rows=reviewCandidates(s),all=reviewCandidates(s,false).filter(w=>!data.wordFlags[w.id]?.archived),today=reviewedToday();
+  const done=all.filter(w=>today.has(w.id)).length;
+  const search=norm(wrongFilter.search);
   $('nav-wrong-count').textContent=s.active.length||'';
-  if(wrongFilter.status==='active')rows=rows.filter(w=>!data.wordFlags[w.id]?.archived&&(w.listen.stage<3||w.spell.stage<3));
-  if(wrongFilter.status==='due')rows=rows.filter(w=>!data.wordFlags[w.id]?.archived&&w.spell.due<=Date.now());
-  if(wrongFilter.status==='archived')rows=rows.filter(w=>data.wordFlags[w.id]?.archived);
-  const search=norm(wrongFilter.search);if(search)rows=rows.filter(w=>w.id.includes(search)||String(records.get(w.id)?.m||'').includes(search));
-  rows.sort((a,b)=>(b.errors+b.legacyWrong)-(a.errors+a.legacyWrong)||b.last-a.last);
   const pageSize=20,pages=Math.max(1,Math.ceil(rows.length/pageSize));wrongFilter.page=Math.min(wrongFilter.page,pages-1);
   const visible=rows.slice(wrongFilter.page*pageSize,(wrongFilter.page+1)*pageSize);
   const scope=wrongFilter.status==='active'?'active':wrongFilter.status==='due'?'due':'wrong';
   const eligible=rows.filter(w=>!data.wordFlags[w.id]?.archived).length;
-  $('view-wrong').innerHTML=`<div class="sheet-head"><h1>错词</h1><p>${rows.length} 个</p></div>
-    <div class="mistake-controls"><input type="search" id="wrong-search" aria-label="搜索单词或中文" value="${escapeHTML(wrongFilter.search)}" placeholder="搜索单词或中文"><select id="wrong-status" aria-label="错词范围">${[['active','待复习'],['all','全部记录'],['due','已到期'],['archived','已暂停']].map(([v,t])=>`<option value="${v}" ${wrongFilter.status===v?'selected':''}>${t}</option>`).join('')}</select><button class="btn primary" data-start-mode="spell" ${!eligible?'disabled':''}>复习${eligible?' '+Math.min(20,eligible)+' 词':''}</button></div>
+  $('view-wrong').innerHTML=`<div class="sheet-head"><h1>错词复习</h1><p>今日已复习 ${done} 词 · 还剩 ${all.length-done} 词</p></div>
+    <div class="mistake-controls"><input type="search" id="wrong-search" aria-label="搜索单词或中文" value="${escapeHTML(wrongFilter.search)}" placeholder="搜索单词或中文"><select id="wrong-status" aria-label="错词范围">${[['active','待复习'],['all','全部记录'],['due','已到期'],['archived','已暂停']].map(([v,t])=>`<option value="${v}" ${wrongFilter.status===v?'selected':''}>${t}</option>`).join('')}</select><button class="btn primary" data-start-mode="spell" ${!eligible?'disabled':''}>${wrongFilter.day==='done'?'重练':'开始复习'}${eligible?' '+(wrongFilter.limit?Math.min(wrongFilter.limit,eligible):eligible)+' 词':''}</button></div>
     ${reviewControls(scope)}
-    ${visible.length?`<ul class="mistake-list">${visible.map(w=>{const word=records.get(w.id)||{w:w.id,m:''};return `<li class="mistake-row"><div><button class="mistake-word" data-detail="${escapeHTML(w.id)}">${escapeHTML(word.w)}</button><p class="mistake-meaning">${escapeHTML(word.m)}</p></div><span class="mistake-count">错 ${w.errors+w.legacyWrong} 次</span><div class="mistake-actions"><button class="btn small" data-single="${escapeHTML(w.id)}">练习</button><details class="mistake-more"><summary aria-label="${escapeHTML(word.w)} 的更多操作">···</summary><div><button data-detail="${escapeHTML(w.id)}">查看记录</button><button data-archive="${escapeHTML(w.id)}">${data.wordFlags[w.id]?.archived?'恢复复习':'暂停复习'}</button></div></details></div></li>`;}).join('')}</ul>`:empty(search?'没有找到这个词':wrongFilter.status==='active'?'没有待复习的错词':wrongFilter.status==='due'?'暂时没有到期错词':'这里还没有记录')}
+    ${visible.length?`<ul class="mistake-list">${visible.map(w=>{const word=records.get(w.id)||{w:w.id,m:''};return `<li class="mistake-row"><div><button class="mistake-word" data-detail="${escapeHTML(w.id)}">${escapeHTML(word.w)}</button><p class="mistake-meaning">${escapeHTML(word.m)}</p></div><span class="mistake-count">错 ${w.errors+w.legacyWrong} 次</span><div class="mistake-actions"><button class="btn small" data-single="${escapeHTML(w.id)}">练习</button><details class="mistake-more"><summary aria-label="${escapeHTML(word.w)} 的更多操作">···</summary><div><button data-detail="${escapeHTML(w.id)}">查看记录</button><button data-archive="${escapeHTML(w.id)}">${data.wordFlags[w.id]?.archived?'恢复复习':'暂停复习'}</button></div></details></div></li>`;}).join('')}</ul>`:empty(search?'这个范围没有匹配的词':all.length&&wrongFilter.day==='pending'?'今天的词已复习完，可切换到「今天已复习 · 重练」':wrongFilter.day==='done'?(done?'本轮重练已完成':'今天还没有复习过的词'):wrongFilter.status==='active'?'没有待复习的错词':wrongFilter.status==='due'?'暂时没有到期错词':'这里还没有记录')}
+    ${wrongFilter.day==='done'&&!eligible&&done?'<button class="btn" data-action="restart-review">再重练一轮</button>':''}
     ${pages>1?`<div class="pager"><span>${wrongFilter.page+1} / ${pages} 页</span><div class="btn-row"><button class="btn small" data-page="-1" ${wrongFilter.page===0?'disabled':''}>上一页</button><button class="btn small" data-page="1" ${wrongFilter.page>=pages-1?'disabled':''}>下一页</button></div></div>`:''}`;
   $('wrong-search').addEventListener('input',e=>{wrongFilter.search=e.target.value;wrongFilter.page=0;const pos=e.target.selectionStart;renderWrong();$('wrong-search').focus();try{$('wrong-search').setSelectionRange(pos,pos);}catch{}});
   $('wrong-status').addEventListener('change',e=>{wrongFilter.status=e.target.value;wrongFilter.page=0;renderWrong();});
+  for(const [id,key] of [['review-order','sort'],['review-day','day'],['review-limit','limit']])$(id).addEventListener('change',e=>{wrongFilter[key]=key==='limit'?Number(e.target.value):e.target.value;if(key==='day'&&e.target.value==='done')repeatReviewDone.clear();wrongFilter.page=0;renderWrong();});
 }
 function wordDetail(id) {
   const w=records.get(id);if(!w)return;
@@ -1419,6 +1439,8 @@ document.addEventListener('click',async e=>{
     case 'import':$('backup-file').click();break;
     case 'fresh':if(ensureCanStart()){persist();showView('dashboard');}break;
     case 'all-sets':{const boxes=[...document.querySelectorAll('#view-'+view+' input[name="practice-set"]')],checked=boxes.every(x=>x.checked);boxes.forEach(x=>x.checked=!checked);break;}
+    case 'restart-review':repeatReviewDone.clear();renderWrong();break;
+    case 'review-next':showView('wrong');if(reviewCandidates().some(w=>!data.wordFlags[w.id]?.archived))startPractice('spell');break;
     case 'resume':showView('practice');break;
     case 'pause':showView('dashboard');break;
     case 'open-audio-settings':showView('settings');break;
