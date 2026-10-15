@@ -429,7 +429,7 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 .compact-zen .inline-answer{font-size:32px;font-weight:550}
 .compact-zen .inline-answer-frame.answer-ok{background:#fbfdf9;border-color:#b2cbb5}
 .compact-zen .inline-answer-frame.answer-wrong{background:#fffafa;border-color:#d8b2ab}
-.compact-zen .answer-meaning{min-height:49px;padding:12px 3px 0;text-align:center;font-size:23px;color:#40563b;line-height:1.55;overflow-wrap:anywhere}
+.compact-zen .answer-meaning{min-height:49px;padding:0 3px 14px;text-align:center;font-size:23px;color:#40563b;line-height:1.55;overflow-wrap:anywhere}
 .compact-zen .zen-answer-form .inline-feedback{height:27px;font-size:11px;white-space:normal;line-height:1.6;text-align:center;gap:10px}
 .compact-zen .practice-command-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:44px;margin-top:14px}
 .compact-zen .zen-answer-form .zen-submit{width:120px;flex:none;min-height:42px!important;height:42px;margin:0;padding:9px 16px;border-radius:6px;background:#41563d;box-shadow:none;font-size:13px;font-weight:500;gap:13px}
@@ -454,7 +454,7 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 .compact-zen.result-close .inline-answer-frame{background:#fffdf7;border-color:#d6b275}
 .compact-zen.result-wrong .inline-answer-frame{background:#fffafa;border-color:#d8a49f}
 .compact-zen.result-wrong .letter-error,.compact-zen.result-wrong .letter-missing{color:#b74744;background:transparent}
-.compact-zen .letter-same{color:#2f7050}
+.compact-zen .letter-same{color:#2f7050}.compact-zen .letter-replacement{display:inline-block;white-space:nowrap}
 
 .compact-zen .answer-verdict svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
 .compact-zen .answer-verdict[hidden]{display:none}
@@ -1508,7 +1508,8 @@ function inlineLetterDiff(input,target) {
   return diffChars(input,target).ops.map(op=>{
     if(op.type==='same')return `<span class="letter-same">${escapeHTML(op.a)}</span>`;
     if(op.type==='missing')return `<ins class="letter-missing" title="漏写的字母">${escapeHTML(op.b)}</ins>`;
-    return `<del class="letter-error" title="${op.type==='extra'?'多写的字母':'写错的字母'}">${escapeHTML(op.a)}</del>`;
+    if(op.type==='replace')return `<span class="letter-replacement"><del class="letter-error" title="写错的字母">${escapeHTML(op.a)}</del><ins class="letter-missing" title="应写的字母">${escapeHTML(op.b)}</ins></span>`;
+    return `<del class="letter-error" title="多写的字母">${escapeHTML(op.a)}</del>`;
   }).join('');
 }
 function showInlineResult(answer,event,w) {
@@ -1542,14 +1543,15 @@ renderPractice = function() {
       <form id="answer-form" class="zen-answer-form">
         <div class="answer-verdict-slot"><div id="answer-verdict" class="answer-verdict" role="img" hidden></div></div>
         <div class="practice-answer-top">
-          <label class="zen-input-label answer-word-label" for="answer-input">${answered?(answered.correct?'<span class="sr-only">你的拼写</span>':'<span class="original-label">原词</span><strong id="canonical-answer">'+escapeHTML(w.w)+'</strong>'):'你的拼写'}</label>
+          <label class="zen-input-label answer-word-label" for="answer-input">${answered?'<span class="original-label">原词</span><strong id="canonical-answer">'+escapeHTML(w.w)+'</strong>':'你的拼写'}</label>
           <button class="zen-play" type="button" data-action="play-current" aria-label="播放单词发音，Shift 或空格重听" title="Shift / 空格：重听">${speakerSVG}<span>${data.settings.autoPlay?'重听':'播放'}</span></button>
         </div>
+        <div id="answer-meaning" class="answer-meaning" aria-live="polite">${answered?escapeHTML(w.m||'暂无中文释义'):''}</div>
         <div class="inline-answer-frame ${answered?(answered.correct?'answer-ok':'answer-wrong'):''}">
           <input id="answer-input" class="spell-input zen-input ${answered?'is-answered':''}" type="text" maxlength="150" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" aria-label="输入你听到的英文单词" placeholder="输入英文单词" value="${escapeHTML(session.draft)}" ${answered?'readonly':''}>
           <div id="inline-answer" class="inline-answer" ${answered?'':'hidden'} aria-live="polite"></div>
         </div>
-        <div id="answer-meaning" class="answer-meaning" aria-live="polite">${answered?escapeHTML(w.m||'暂无中文释义'):''}</div>
+
         <div id="feedback-area" class="inline-feedback" role="status" aria-live="polite"></div>
         <div class="practice-command-row">
           <div class="zen-minor-actions" id="practice-minor-actions">
@@ -1622,7 +1624,7 @@ checkCorrection = function() {
   }
   retrySpelling=false;
   const target=currentWord();
-  document.querySelector('.answer-word-label').innerHTML='<span class="sr-only">你的拼写</span>';
+  document.querySelector('.answer-word-label').innerHTML='<span class="original-label">原词</span><strong id="canonical-answer">'+escapeHTML(target.w)+'</strong>';
   protectAnswerResult(true);
   $('inline-answer').hidden=false;
   $('inline-answer').innerHTML=escapeHTML(input.value);
