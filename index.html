@@ -416,10 +416,10 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 .compact-zen .zen-top{height:68px}
 .compact-zen .zen-center{max-width:520px;width:100%;padding:24px 0 30px;margin:clamp(28px,9vh,96px) auto auto}
 .compact-zen .zen-answer-form{max-width:none;width:100%}
-.compact-zen .practice-answer-top{display:grid;grid-template-columns:60px minmax(0,1fr) 60px;align-items:center;min-height:42px;margin-bottom:8px}
-.compact-zen .answer-word-label{grid-column:2;min-height:42px;display:flex;align-items:center;justify-content:center;gap:8px;margin:0;font-size:12px;font-weight:400;color:#8b9786;line-height:1.5;text-align:center}
-.compact-zen .answer-word-label strong{font-size:22px;font-weight:550;letter-spacing:.015em;color:#304d36;overflow-wrap:anywhere}
-.compact-zen .original-label{font-size:10px;color:#939e8d;flex:none}
+.compact-zen .practice-answer-top{display:grid;grid-template-columns:60px minmax(0,1fr) 60px;align-items:center;min-height:86px;margin-bottom:12px}
+.compact-zen .answer-word-label{grid-column:2;min-height:86px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;margin:0;font-size:12px;font-weight:400;color:#8b9786;line-height:1.5;text-align:center}
+.compact-zen .answer-word-label strong{font-size:clamp(30px,4vw,40px);font-weight:550;letter-spacing:.015em;color:#304d36;overflow-wrap:anywhere}
+.compact-zen .original-label{font-size:11px;color:#939e8d;flex:none}
 .compact-zen .zen-play{grid-column:3;display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;min-width:0;min-height:32px;margin:0;padding:5px 3px;background:transparent;border:0;border-radius:4px;font-size:11px;font-weight:400;color:#82917a;box-shadow:none}
 .compact-zen .zen-play svg{width:17px;height:17px;flex:none}
 .compact-zen .zen-play:hover{background:#edf2e9;color:#47633d;transform:none}
@@ -447,6 +447,15 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 .compact-zen .answer-verdict-slot{height:72px;display:flex;align-items:flex-start;justify-content:center;margin-bottom:8px}
 .compact-zen .answer-verdict{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#38865c;color:#fff}
 .compact-zen .answer-verdict.is-wrong{background:#c95754}
+.compact-zen .answer-verdict.is-close{background:#ce922b}
+.compact-zen.result-correct{background:#f1f8f2}
+.compact-zen.result-close{background:#fff8eb}
+.compact-zen.result-wrong{background:#fcf0ef}
+.compact-zen.result-close .inline-answer-frame{background:#fffdf7;border-color:#d6b275}
+.compact-zen.result-wrong .inline-answer-frame{background:#fffafa;border-color:#d8a49f}
+.compact-zen.result-wrong .letter-error,.compact-zen.result-wrong .letter-missing{color:#b74744;background:transparent}
+.compact-zen .letter-same{color:#2f7050}
+
 .compact-zen .answer-verdict svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
 .compact-zen .answer-verdict[hidden]{display:none}
 .compact-zen .inline-feedback:empty{height:8px}
@@ -1473,13 +1482,25 @@ function protectAnswerResult(correct) {
   button?.setAttribute('aria-disabled','true');
   resultHoldTimer=setTimeout(()=>{if(button?.isConnected)button.removeAttribute('aria-disabled');},1000);
 }
+function answerVisualState(correct,input,target) {
+  if(correct)return 'correct';
+  const diff=diffChars(input||'',target||'');
+  const length=Math.max([...norm(input||'')].length,[...norm(target||'')].length,1);
+  return diff.ops.some(op=>op.type==='same') && diff.distance/length<=0.5?'close':'wrong';
+}
 function animateAnswerResult(correct) {
   const badge=$('answer-verdict');
   if(!badge)return;
+  const state=answerVisualState(correct,$('answer-input')?.value,currentWord()?.w);
+  const shell=badge.closest('.compact-zen');
+  shell?.classList.remove('result-correct','result-close','result-wrong');
+  shell?.classList.add('result-'+state);
   badge.hidden=false;
-  badge.classList.toggle('is-wrong',!correct);
-  badge.setAttribute('aria-label',correct?'回答正确':'回答错误');
-  badge.innerHTML=correct?'<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m7 16 6 6 12-13"/></svg>':'<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m9 9 14 14M23 9 9 23"/></svg>';
+  badge.classList.toggle('is-wrong',state==='wrong');
+  badge.classList.toggle('is-close',state==='close');
+  badge.setAttribute('aria-label',state==='correct'?'回答正确':state==='close'?'接近正确，仍需订正':'回答错误');
+  const path=state==='correct'?'m7 16 6 6 12-13':state==='close'?'M16 7v12m0 6v.1':'m9 9 14 14M23 9 9 23';
+  badge.innerHTML=`<svg viewBox="0 0 32 32" aria-hidden="true"><path d="${path}"/></svg>`;
 }
 
 function inlineLetterDiff(input,target) {
@@ -1577,6 +1598,7 @@ correction = function() {
   if(!data.session?.answered || data.session.answered.correct) return;
   retrySpelling=true;
   $('answer-verdict').hidden=true;
+  document.querySelector('.compact-zen')?.classList.remove('result-correct','result-close','result-wrong');
   clearTimeout(resultHoldTimer);resultHoldUntil=0;$('submit-answer').removeAttribute('aria-disabled');
   if($('canonical-answer'))$('canonical-answer').hidden=true;
   document.querySelector('.answer-word-label .original-label')?.setAttribute('hidden','');
