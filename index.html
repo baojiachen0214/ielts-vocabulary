@@ -411,6 +411,23 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 .compact-zen .practice-sources summary{font-size:11px;font-weight:400;color:#85927c;line-height:1.8;letter-spacing:0;cursor:pointer}
 .compact-zen .practice-sources ul{list-style:none;padding:10px 12px;margin:8px 0 0;max-height:170px;overflow:auto;background:#f1f4ed;border-radius:4px;text-align:left;line-height:1.9}
 @media(max-width:600px){.library-name{gap:12px}.library-name>span{font-size:10px}.library-row{grid-template-columns:14px minmax(110px,1fr) 35px 75px;gap:8px}.library-row-track{display:none}.library-row{grid-template-columns:14px minmax(110px,1fr) 75px}}
+
+.compact-zen .answer-word-label{min-height:35px;display:flex;align-items:center;gap:12px;margin-bottom:9px}
+.compact-zen .answer-word-label strong{font-size:25px;font-weight:600;letter-spacing:.025em;color:#294c37;line-height:1.4;overflow-wrap:anywhere}
+.compact-zen .original-label{font-size:11px;color:#869481;flex:none}
+.compact-zen .answer-meaning{min-height:45px;padding:11px 4px 0;text-align:center;font-size:18px;color:#39513d;line-height:1.6;overflow-wrap:anywhere}
+.compact-zen .zen-answer-form .inline-feedback{height:31px;font-size:11px;white-space:normal;line-height:1.6;text-align:center}
+.compact-zen .zen-answer-form .zen-submit{margin-top:10px}
+.compact-zen .zen-submit[aria-disabled="true"]{opacity:.68;cursor:default}
+.compact-zen .practice-sources{margin-top:15px}
+.compact-zen .letter-error{text-decoration:none;color:#b94f50;font-weight:600}
+.compact-zen .empty-spelling{font-size:17px;font-weight:400;color:#a0817d}
+.compact-zen .result-success-motion{animation:answer-confirm .5s ease-out}
+.compact-zen .result-error-motion{animation:answer-correct .38s ease-in-out}
+@keyframes answer-confirm{0%{box-shadow:0 0 0 0 #70ab7940;background:#e7f5e8}50%{box-shadow:0 0 0 7px #70ab7915}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes answer-correct{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}65%{transform:translateX(-2px)}85%{transform:translateX(2px)}}
+@media(max-width:700px){.compact-zen .answer-meaning{font-size:16px}.compact-zen .answer-word-label strong{font-size:23px}}
+@media(prefers-reduced-motion:reduce){.compact-zen .result-success-motion,.compact-zen .result-error-motion{animation:none!important}}
 </style>
 </head>
 <body>
@@ -1004,7 +1021,8 @@ function correction() {
 }
 function checkCorrection() { const good=isRight($('correction-input').value,currentWord().w);$('correction-status').textContent=good?'订正正确。首答仍按原结果保存，稍后再复习。':'还不一致，请再试一次。';if(good)$('submit-answer').focus(); }
 function nextQuestion() {
-  if(!data.session?.answered)return;
+  if(!data.session?.answered||Date.now()<resultHoldUntil)return;
+  clearTimeout(resultHoldTimer);resultHoldUntil=0;
   stopAudio();clearTimeout(inputTimer);data.session.index++;data.session.answered=null;data.session.assisted=false;data.session.draft='';data.session.updatedAt=Date.now();persist();renderPractice();
 }
 function renderSessionEnd() {
@@ -1418,17 +1436,24 @@ window.addEventListener('storage',e=>{
 // Audio-first practice: show Chinese meanings and parts of speech only after submission.
 // All learning records, error history and the v2 localStorage schema are unchanged.
 let retrySpelling = false;
-function inlineLetterDiff(input, target) {
-  // Every correction appears in a single visual line, exactly where the input was.
-  let pos=0; const exact=[...target];
-  return diffChars(input,target).ops.map(op=>{
-    const got = escapeHTML(op.a || '');
-    const right = op.type==='extra' ? '' : escapeHTML(exact[pos++] ?? op.b ?? '');
-    if(op.type==='same') return `<span class="letter-same">${right}</span>`;
-    if(op.type==='replace') return `<span class="letter-error" title="你写的是 ${got}">${right}</span>`;
-    if(op.type==='missing') return `<span class="letter-error" title="漏写的字母">${right}</span>`;
-    return `<del class="letter-extra" title="多写的字母">${got}</del>`;
-  }).join('');
+let resultHoldUntil=0,resultHoldTimer,lastAnimatedAnswerId=null;
+function protectAnswerResult(correct) {
+  clearTimeout(resultHoldTimer);
+  resultHoldUntil=Date.now()+(correct?650:1000);
+  const button=$('submit-answer');
+  button?.setAttribute('aria-disabled','true');
+  resultHoldTimer=setTimeout(()=>{if(button?.isConnected)button.removeAttribute('aria-disabled');},correct?650:1000);
+}
+function animateAnswerResult(correct) {
+  const frame=document.querySelector('#answer-form .inline-answer-frame');
+  frame?.classList.remove('result-success-motion','result-error-motion');
+  if(frame){void frame.offsetWidth;frame.classList.add(correct?'result-success-motion':'result-error-motion');}
+}
+
+function inlineLetterDiff(input,target) {
+  // Show only what was typed; never interleave inserted answer letters or strikeouts.
+  if(!input)return '<span class="empty-spelling">未作答</span>';
+  return diffChars(input,target).ops.filter(op=>op.a).map(op=>`<span class="${op.type==='same'?'letter-same':'letter-error'}">${escapeHTML(op.a)}</span>`).join('');
 }
 function showInlineResult(answer,event,w) {
   const display=$('inline-answer');
@@ -1437,7 +1462,7 @@ function showInlineResult(answer,event,w) {
   display.classList.toggle('is-good',event.correct);
   display.classList.toggle('is-bad',!event.correct);
   display.innerHTML=event.correct ? escapeHTML(event.input||w.w) : inlineLetterDiff(event.input,w.w);
-  display.setAttribute('aria-label',event.correct?'拼写正确：'+w.w:'正确拼写：'+w.w+'。红色标注了需要修改的字母');
+  display.setAttribute('aria-label',event.correct?'拼写正确：'+w.w:'你的拼写：'+(event.input||'未作答')+'。原词：'+w.w);
   $('answer-input').classList.add('is-answered');
 }
 renderPractice = function() {
@@ -1459,20 +1484,21 @@ renderPractice = function() {
     <div class="zen-progress"><div style="width:${Math.round(session.index/session.items.length*100)}%"></div></div>
     <div class="zen-center">
       <div class="zen-eyebrow">${spell?'专注拼写':'单词听写'}</div>
-      <h1 class="zen-question" id="practice-meaning" aria-live="polite">${answered?escapeHTML(w.m||'暂无中文释义'):'听音拼写'}</h1>
+      <h1 class="zen-question" id="practice-meaning" aria-live="polite">听音拼写</h1>
       <div class="zen-audio-block">
         <button class="zen-play" type="button" data-action="play-current" aria-label="播放单词发音，Shift 或空格重听" title="Shift / 空格：重听发音">${speakerSVG}<span>播放发音</span><kbd>Shift</kbd></button>
         <div id="audio-status" class="zen-status" role="status" aria-live="polite">${data.settings.provider==='youdao'?'有道词典 · ':''}按 Shift 或空格重听</div>
       </div>
       <form id="answer-form" class="zen-answer-form">
-        <label class="zen-input-label" for="answer-input">${answered?'拼写结果':'你的拼写'}</label>
+        <label class="zen-input-label answer-word-label" for="answer-input">${answered?'<span class="original-label">原词</span><strong id="canonical-answer">'+escapeHTML(w.w)+'</strong>':'你的拼写'}</label>
         <div class="inline-answer-frame ${answered?(answered.correct?'answer-ok':'answer-wrong'):''}">
           <input id="answer-input" class="spell-input zen-input ${answered?'is-answered':''}" type="text" maxlength="150" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" aria-label="输入你听到的英文单词" placeholder="输入英文单词" value="${escapeHTML(session.draft)}" ${answered?'readonly':''}>
           <div id="inline-answer" class="inline-answer" ${answered?'':'hidden'} aria-live="polite"></div>
         </div>
+        <div id="answer-meaning" class="answer-meaning" aria-live="polite">${answered?escapeHTML(w.m||'暂无中文释义'):''}</div>
+        <div id="feedback-area" class="inline-feedback" role="status" aria-live="polite"></div>
         <button type="submit" class="zen-submit" id="submit-answer">${answered?'下一个单词 <span>→</span>':'确认拼写 <span>↵</span>'}</button>
       </form>
-      <div id="feedback-area" class="inline-feedback" role="status" aria-live="polite"></div>
       ${practiceSources(w)}
       <div class="zen-minor-actions" id="practice-minor-actions">
         ${answered?`<button type="button" class="zen-quiet" data-detail="${escapeHTML(w.id)}">查看词条</button>${!answered.correct?'<span class="zen-separator">·</span><button type="button" class="zen-quiet" data-action="correction">重新拼写</button>':''}`:
@@ -1503,12 +1529,19 @@ showHint = function() {
 };
 renderFeedback = function(event,w) {
   showInlineResult(event.input,event,w);
-  const base=event.correct?event.assisted?'已答对 · 使用过提示':'✓ 拼写正确':'拼写有误 · 标红的是正确写法';
+  if(event.id!==lastAnimatedAnswerId){
+    lastAnimatedAnswerId=event.id;
+    animateAnswerResult(event.correct);protectAnswerResult(event.correct);
+  }
+
+  const base=event.correct?event.assisted?'已答对 · 使用过提示':'✓ 拼写正确':'拼写有误 · 对照上方原词';
   $('feedback-area').innerHTML=`<span class="inline-result-msg ${event.correct?'result-good':'result-bad'}">${base}</span>${!event.correct?'<span class="inline-result-secondary">已保留在错词档案</span>':''}`;
 };
 correction = function() {
   if(!data.session?.answered || data.session.answered.correct) return;
   retrySpelling=true;
+  clearTimeout(resultHoldTimer);resultHoldUntil=0;$('submit-answer').removeAttribute('aria-disabled');
+  if($('canonical-answer'))$('canonical-answer').hidden=true;
   const input=$('answer-input'),form=$('answer-form');
   const result=$('inline-answer');
   if(result) result.hidden=true;
@@ -1524,15 +1557,19 @@ checkCorrection = function() {
   const input=$('answer-input'),correct=isRight(input.value,currentWord().w);
   if(!correct) {
     $('feedback-area').innerHTML='<span class="result-bad">仍有拼写差异，请再试一次</span>';
+    animateAnswerResult(false);
     input.classList.add('retry-error');input.focus({preventScroll:true});return;
   }
   retrySpelling=false;
   const target=currentWord();
+  if($('canonical-answer'))$('canonical-answer').hidden=false;
+  protectAnswerResult(true);
   $('inline-answer').hidden=false;
   $('inline-answer').innerHTML=escapeHTML(input.value);
   $('inline-answer').className='inline-answer is-good';
   input.classList.remove('retry-error');input.classList.add('is-answered');input.readOnly=true;
   document.querySelector('#answer-form .inline-answer-frame').className='inline-answer-frame answer-ok';
+  animateAnswerResult(true);
   $('feedback-area').innerHTML='<span class="result-good">✓ 订正正确 · 原首答记录不变</span>';
   $('submit-answer').innerHTML='下一个单词 <span>→</span>';
   $('practice-minor-actions').innerHTML=`<button type="button" class="zen-quiet" data-detail="${escapeHTML(target.id)}">查看词条</button>`;
