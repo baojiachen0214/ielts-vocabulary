@@ -1,0 +1,36 @@
+{
+  "source": "Local mock-system Cambridge listening answer data",
+  "books": [
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21
+  ],
+  "papers": 56,
+  "questions_examined": 1120,
+  "included_questions": 938,
+  "excluded": {
+    "numbers_dates_codes": 86,
+    "unreviewed_proper_name_variants": 33,
+    "phrases_or_unreviewed_format": 14,
+    "non_text_completion_questions": 49
+  },
+  "words_by_part": {
+    "1": 368,
+    "4": 513
+  },
+  "new_spellings": 469,
+  "frequency_definition": "Number of distinct Cambridge test papers accepting this spelling in this part; repeated questions within the same paper count once.",
+  "year_policy": "Book and Test are known; actual exam years are not inferred from book numbers or file timestamps.",
+  "original_year_frequency": "Original year-list frequencies remain unchanged and are ranked separately from Cambridge paper counts."
+}
