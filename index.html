@@ -1194,7 +1194,7 @@ async function playWord(word) {
   if(!entry.ready)audioStatus('正在加载发音…');
   let timer;
   try {
-    const prepared=await entry.available;
+    const prepared=entry.audio&&!entry.cancelled?entry:await entry.available;
     if(seq!==audioSequence)return;
     if(!prepared||entry.cancelled)throw entry.error||new Error('这个词的发音暂不可用');
     const audio=entry.audio;currentAudio=audio;
