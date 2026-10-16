@@ -465,6 +465,7 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 .review-filters{display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap;margin:0 0 22px;color:#7d8974;font-size:12px}
 .review-filters label{display:flex;align-items:center;gap:7px}.review-filters input,.review-filters select{font:inherit;padding:7px 9px;border:1px solid #dfe3d7;border-radius:5px;background:#fff;color:#45533c;width:auto;min-height:34px}.review-filters input[type=number]{width:66px}.review-date-range{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .wrong-date-details{font-size:11px;color:#969b90;margin-top:5px}.wrong-date-details summary{cursor:pointer}.wrong-date-details>div{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:8px 0;max-height:150px;overflow:auto}.wrong-date-details button{border:0;background:transparent;font:inherit;padding:2px 0;color:#788269;text-decoration:underline;text-underline-offset:3px}
+.compact-zen .answer-error-count{min-height:23px;padding-top:7px;font-size:12px;line-height:16px;color:#99816e;text-align:center}
 </style>
 </head>
 <body>
@@ -1593,6 +1594,8 @@ renderPractice = function() {
   const w=currentWord();
   if(!w){$('view-practice').innerHTML=empty('此题单词暂不可用','请先导出备份，现有成绩不会被删除。');return;}
   const answered=session.answered;
+  const wordStats=allStats().perWord.get(w.id);
+  const errorCount=(wordStats?.errors||0)+(wordStats?.legacyWrong||0);
   const spell=session.mode==='spell';
   retrySpelling=false;
   practiceStarted=Date.now();
@@ -1616,6 +1619,7 @@ renderPractice = function() {
           <div id="inline-answer" class="inline-answer" ${answered?'':'hidden'} aria-live="polite"></div>
         </div>
 
+        <div class="answer-error-count" aria-live="polite">${errorCount?`累计错 ${errorCount} 次`:""}</div>
         <div id="feedback-area" class="inline-feedback" role="status" aria-live="polite"></div>
         <div class="practice-command-row">
           <div class="zen-minor-actions" id="practice-minor-actions">
