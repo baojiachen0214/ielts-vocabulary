@@ -8,9 +8,17 @@ const change=(id,value)=>{const el=d.getElementById(id);el.value=String(value);e
 function finishBatch(){const ids=[];while(get('data.session.index<data.session.items.length')){ids.push(get('currentWord().id'));d.querySelector('#answer-input').value=ids.length%2?get('currentWord().w'):'xyzxyz';submit();time+=1001;submit();}return ids;}
 (async()=>{try{
 new vm.Script(code).runInContext(dom.getInternalVMContext());
-get(`data.confirmedFresh=true;data.settings.autoPlay=false;var shared=[...records.values()].find(w=>w.sets.some(k=>k.startsWith('20'))&&w.sources.length);var expected=YEAR_BANK_KEYS.reduce((n,k)=>n+(BANK_INDEX.get(k)?.get(shared.id)?.f||0),0);var papers=new Set(shared.sources.map(s=>s.paperId)).size;showView('wrong');startPractice('spell',shared.id);`);
-assert.match(d.querySelector('.word-corpus-frequency').textContent,new RegExp(`年份词表累计 ${get('expected')} 次`));assert.match(d.querySelector('.word-corpus-frequency').textContent,new RegExp(`剑桥 ${get('papers')} 套`));
-get(`var synthetic={id:'test-only',sources:[{paperId:'1',part:1,question:1},{paperId:'1',part:4,question:40},{paperId:'2',part:4,question:35}]};`);assert.match(get('wordCorpusFrequency(synthetic)'),/剑桥 2 套/);assert.equal(get('wordCorpusFrequency({id:"unknown",sources:[]})'),'');
-get('data.session.items[0].setKeys=[shared.sets[0]];renderPractice()');assert.match(d.querySelector('.word-corpus-frequency').textContent,new RegExp(`年份词表累计 ${get('expected')} 次`));assert.equal(errors.length,0);
-console.log('PASS global year frequency and deduplicated paper counts, independent of selected bank; no unknown counts fabricated.');
+get(`data.confirmedFresh=true;data.settings.autoPlay=false;var shared=[...records.values()].find(w=>w.sets.some(k=>k.startsWith('20'))&&w.sources.length);var expected=Object.keys(WORDS_DATA).reduce((n,k)=>n+(BANK_INDEX.get(k)?.get(shared.id)?.f||0),0);showView('wrong');startPractice('spell',shared.id);`);
+assert.equal(d.querySelector('.word-corpus-frequency').textContent,`词库累计出现 ${get('expected')} 次`);
+assert.equal(get('corpusFrequencyCounts(shared).total'),get('shared.frequency'));
+// Raw f values, rather than number of banks, determine the result.
+get(`var highFrequency=[...records.values()].find(w=>w.frequency>w.sets.length);var raw=highFrequency.sets.reduce((n,k)=>n+BANK_INDEX.get(k).get(highFrequency.id).f,0);`);
+assert.equal(get('corpusFrequencyCounts(highFrequency).total'),get('raw'));assert(get('raw>highFrequency.sets.length'));
+// Additional virtual views and redundant source metadata cannot inflate the total.
+get(`AGGREGATE_BANKS.AnotherView=Object.keys(WORDS_DATA);var copy={...shared,sources:[...shared.sources,...shared.sources]};`);
+assert.equal(get('corpusFrequencyCounts(copy).total'),get('expected'));
+assert.equal(get('wordCorpusFrequency({id:"unknown",sources:[{paperId:"999"}]})'),'');
+get('data.session.items[0].setKeys=[shared.sets[0]];renderPractice()');assert.equal(d.querySelector('.word-corpus-frequency').textContent,`词库累计出现 ${get('expected')} 次`);assert.match(d.querySelector('.practice-sources ul').textContent,/按原始频次字段累计/);assert.equal(errors.length,0);
+console.log('PASS full-corpus total sums original f fields, never bank membership count; virtual views and source duplication do not inflate it.');
+console.log('PASS combined frequency is global, shows its breakdown and omits unavailable counts.');
 }finally{await new Promise(r=>setTimeout(r,0));dom.window.close();}})().catch(e=>{console.error(e);process.exitCode=1});

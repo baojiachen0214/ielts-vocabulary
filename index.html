@@ -554,13 +554,14 @@ function bankLabel(key) {
   if(key.startsWith('Cambridge_'))return '剑桥 8–21 · '+key.replace('Cambridge_Part','Part ');
   return setLabel(key);
 }
+function corpusFrequencyCounts(word) {
+  const year=YEAR_BANK_KEYS.reduce((count,key)=>count+int(BANK_INDEX.get(key)?.get(word.id)?.f),0);
+  const cambridge=Object.keys(WORDS_DATA).filter(key=>key.startsWith('Cambridge_')).reduce((count,key)=>count+int(BANK_INDEX.get(key)?.get(word.id)?.f),0);
+  return {year,cambridge,total:year+cambridge};
+}
 function wordCorpusFrequency(word) {
-  const yearCount=YEAR_BANK_KEYS.reduce((total,key)=>total+int(BANK_INDEX.get(key)?.get(word.id)?.f),0);
-  const paperCount=new Set((word.sources||[]).map(source=>source.paperId)).size;
-  const parts=[];
-  if(yearCount)parts.push(`年份词表累计 ${yearCount} 次`);
-  if(paperCount)parts.push(`剑桥 ${paperCount} 套`);
-  return parts.length?`<div class="word-corpus-frequency" title="按全部词库统计；年份词表频次与剑桥套题数分别计数，避免重合相加。">全词库：${parts.join(' · ')}</div>`:'';
+  const {total}=corpusFrequencyCounts(word);
+  return total?`<div class="word-corpus-frequency" title="合计各原始词表记录的频次，不按收录词库数量计数；来源间可能重合，不代表去重后的真实考试次数。">词库累计出现 ${total} 次</div>`:'';
 }
 function practiceSources(word) {
   const keys=data.session?.items[data.session.index]?.setKeys||word.sets;
@@ -574,9 +575,11 @@ function practiceSources(word) {
   if(years.length)snippets.push(years.join('、')+' 年词表');
   if(sources.length)snippets.push(`剑桥 ${sources[0].book} Test ${sources[0].test}${papers.size>1?' 等 '+papers.size+' 套':''}`);
   if(!snippets.length)return '';
+  const frequency=corpusFrequencyCounts(word);
+  const frequencyRow=frequency.total?`<li>全词库频次：年份词表 ${frequency.year} + 剑桥词表 ${frequency.cambridge} = ${frequency.total} 次。按原始频次字段累计，来源间未作套题去重。</li>`:'';
   const yearRows=yearKeys.map(key=>`<li>${escapeHTML(setLabel(key))} · 词表 ${int(BANK_INDEX.get(key)?.get(word.id)?.f)} 次（未提供套题号）</li>`);
   const paperRows=sources.map(source=>`<li>剑桥 ${source.book} Test ${source.test} · Part ${source.part} · 第 ${source.question} 题</li>`);
-  return `<details class="practice-sources"><summary>来源：${escapeHTML(snippets.join(' · '))}</summary><ul>${yearRows.join('')}${paperRows.join('')}</ul></details>`;
+  return `<details class="practice-sources"><summary>来源：${escapeHTML(snippets.join(' · '))}</summary><ul>${frequencyRow}${yearRows.join('')}${paperRows.join('')}</ul></details>`;
 }
 
 const ORIGINAL_UNIQUE = records.size;
