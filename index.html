@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
+<meta name="app-version" content="2026.10.16.2">
 <title>雅思词汇 · 听写练习</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%232c4155'/%3E%3Cpath d='M18 20h28M18 32h21M18 44h28' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>:root{--ink:#20364b;--text:#263749;--muted:#6b7b89;--accent:#46695d;--accent-light:#edf4ef;--bg:#f5f6f8;--card:#fff;--line:#e4e8ed;--blue:#577ba5;--red:#b25454;--red-light:#fcf1f0;--gold:#a77731;--radius:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);font-synthesis:none}
@@ -467,6 +468,7 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 .wrong-date-details{font-size:11px;color:#969b90;margin-top:5px}.wrong-date-details summary{cursor:pointer}.wrong-date-details>div{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:8px 0;max-height:150px;overflow:auto}.wrong-date-details button{border:0;background:transparent;font:inherit;padding:2px 0;color:#788269;text-decoration:underline;text-underline-offset:3px}
 .compact-zen .answer-error-count{min-height:23px;padding-top:7px;font-size:12px;line-height:16px;color:#99816e;text-align:center}
 .compact-zen .word-corpus-frequency{margin:16px 0 0;font-size:12px;line-height:1.7;color:#7c8871;text-align:center}.compact-zen .word-corpus-frequency+.practice-sources{margin-top:4px}
+.app-update-notice{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:16px;max-width:calc(100vw - 28px);padding:12px 16px;border:1px solid #d9e2d2;border-radius:8px;background:#fff;box-shadow:0 3px 18px #203c2814;font-size:12px;color:#526048}.app-update-notice span{white-space:nowrap}.app-update-notice .btn{white-space:nowrap}
 </style>
 </head>
 <body>
@@ -491,6 +493,7 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
   <footer class="storage-footer"><span id="save-status" role="status">正在读取记录</span></footer>
 </main>
 <dialog id="word-dialog"><div id="word-detail"></div><div class="dialog-footer"><button class="btn" id="close-dialog">关闭</button></div></dialog>
+<div id="app-update-notice" class="app-update-notice" role="status" hidden><span>有新版本，更新后继续练习</span><button class="btn small" data-action="update-page">保存并更新</button></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <input type="file" id="backup-file" accept=".json,application/json" hidden>
 <input type="file" id="audio-pack-file" accept=".json,application/json" hidden>
@@ -499,6 +502,7 @@ body:not(.focus-mode) .notice{border-radius:4px;font-size:12px;padding:12px 14px
 'use strict';
 // No external script dependencies. Legacy storage keys are read-only in this version.
 const WORDS_DATA = JSON.parse(document.getElementById('words-data').textContent);
+const APP_VERSION=document.querySelector('meta[name=app-version]').content;
 const STORE_KEY = 'ielts_learning_v2';
 const PREVIOUS_KEY = 'ielts_learning_v2_previous';
 const LEGACY_KEYS = ['ielts_spell_stats', 'ielts_wrong_book', 'ielts_progress', 'ielts_voice_settings_v1'];
@@ -759,6 +763,24 @@ function persist() {
     return true;
   } catch (e) { warnStorage('保存失败（存储被禁止、空间不足或其他标签页存档异常）。本次内容仍在页面内，请立即“备份进度”，不要关闭页面。'); return false; }
 }
+let lastVersionCheck=0,latestPageVersion='';
+function isNewerPageVersion(version) {
+  if(!/^\d{4}\.\d{2}\.\d{2}\.\d+$/.test(version))return false;
+  const next=version.split('.').map(Number),current=APP_VERSION.split('.').map(Number);
+  for(let i=0;i<next.length;i++){if(next[i]!==current[i])return next[i]>current[i];}
+  return false;
+}
+async function checkForPageUpdate(force=false) {
+  if(!/^https?:$/.test(location.protocol)||typeof fetch!=='function')return;
+  if(!force&&Date.now()-lastVersionCheck<60000)return;
+  lastVersionCheck=Date.now();
+  try {
+    const response=await fetch(new URL('version.json',location.href),{cache:'no-store'});
+    if(!response.ok)return;
+    const info=await response.json();
+    if(typeof info.version==='string'&&isNewerPageVersion(info.version)){latestPageVersion=info.version;$('app-update-notice').hidden=false;}
+  } catch { /* Offline practice stays available. */ }
+}
 function toast(text) { $('toast').textContent = text; $('toast').style.display = 'block'; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').style.display = 'none',4500); }
 function downloadFile(name,value,type='application/json;charset=utf-8') {
   const blob = value instanceof Blob ? value : new Blob([typeof value === 'string' ? value : JSON.stringify(value,null,2)],{type});
@@ -985,13 +1007,14 @@ function renderDashboard() {
     root.querySelectorAll('input[name="practice-set"]').forEach(el=>el.checked=selectedKeys.includes(el.value));
     const remaining=libraryScope==='all'?bankWords(key).length:bankWords(key).length-counts[key];
     $('practice-scope').value=libraryScope;$('only-unseen').checked=libraryScope==='untouched';
-    $('library-start-info').textContent=remaining?`高频优先 · 本次 ${Math.min(libraryLimit,remaining)} 词`:'已练完。可选其他词库，或取消勾选重练。';
+    $('library-start-info').textContent=remaining?(libraryScope==='all'&&counts[key]?`重练模式 · 含已练单词 ${counts[key]} 个 · 本次 ${Math.min(libraryLimit,remaining)} 词`:`高频优先 · 本次 ${Math.min(libraryLimit,remaining)} 词`):'已练完。可选其他词库，或取消勾选重练。';
     $('library-start').disabled=!remaining;
+    $('library-start').textContent=libraryScope==='all'&&counts[key]?'开始重练':'开始听写';
     $('library-frequency-note').textContent=key==='All_Complete'?'收录现有 Part 1、Part 4 全部词汇。年份词频优先，同频按剑桥套题频次排序，两种频次不相加。':key.startsWith('Cambridge_')?'频次按不同套题计数；剑桥册号不等于考试年份。':'频次沿用原年份词表；跨年汇总相加，同一拼写只出一题。';
     preloadFirstAudio(key,libraryScope);
   };
   for(const radio of root.querySelectorAll('input[name="library-bank"]'))radio.addEventListener('change',()=>{
-    librarySelection=radio.value;update();
+    librarySelection=radio.value;libraryScope='untouched';update();
   });
   $('only-unseen').addEventListener('change',e=>{libraryScope=e.target.checked?'untouched':'all';update();});
   $('practice-limit').addEventListener('change',e=>{libraryLimit=Number(e.target.value);update();});
@@ -1519,7 +1542,7 @@ async function generateAudioBatch() {
 }
 function renderSettings() {
   const s=allStats();
-  $('view-settings').innerHTML=`<div class="settings-sheet"><div class="sheet-head"><h1>设置</h1></div>
+  $('view-settings').innerHTML=`<div class="settings-sheet"><div class="sheet-head"><h1>设置</h1><p>版本 ${APP_VERSION}</p></div>
     <section class="setting-section"><h2>发音</h2>
       <label class="setting-row"><span>口音</span><select id="audio-accent"><option value="en-GB" ${data.settings.accent==='en-GB'?'selected':''}>英式</option><option value="en-US" ${data.settings.accent==='en-US'?'selected':''}>美式</option></select></label>
       <label class="setting-row"><span>语速 <span id="rate-label">${data.settings.rate.toFixed(2)}×</span></span><input type="range" id="audio-rate" min="0.5" max="1.2" step="0.05" value="${data.settings.rate}"></label>
@@ -1568,6 +1591,7 @@ document.addEventListener('click',async e=>{
   if(b.dataset.errorDate){wrongFilter.period='custom';wrongFilter.from=b.dataset.errorDate;wrongFilter.to=b.dataset.errorDate;wrongFilter.page=0;showView('wrong');return;}
   if(b.dataset.page){wrongFilter.page=Math.max(0,wrongFilter.page+Number(b.dataset.page));renderWrong();return;}
   switch(b.dataset.action){
+    case 'update-page':flushDraft();if(persist()){const url=new URL(location.href);url.searchParams.set('v',latestPageVersion||APP_VERSION);location.replace(url.href);}break;
     case 'export':exportBackup();break;
     case 'raw':exportRaw();break;
     case 'previous':{const value=storageRead(PREVIOUS_KEY);if(value)downloadFile(`雅思上次存档-${Date.now()}.json`,value);else toast('还没有可用的上次存档。');break;}
@@ -1841,6 +1865,8 @@ let librarySelection='';
 let libraryScope='untouched';
 let libraryLimit=20;
 showView('dashboard');
+checkForPageUpdate();
+window.addEventListener('focus',()=>checkForPageUpdate());
 if(!corruptStore&&(hasLegacy(data.legacy)||data.attempts.length||data.confirmedFresh))persist();
 else if(!storageProblem)$('save-status').textContent='记录保存在当前浏览器';
 
