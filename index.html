@@ -777,8 +777,14 @@ function allStats() {
     return perWord.get(id);
   }
   for (const id of Object.keys(data.legacy.wrongBook)) get(id);
-  const progress = {};
-  for (const key of Object.keys(WORDS_DATA)) progress[key] = new Set((data.legacy.progress[key]?.done || []).map(norm));
+  const progress = {},practicedWords=new Set();
+  for (const key of Object.keys(WORDS_DATA)) {
+    progress[key]=new Set();
+    for(const word of data.legacy.progress[key]?.done||[]) {
+      const id=norm(word);
+      if(BANK_INDEX.get(key)?.has(id))practicedWords.add(id);
+    }
+  }
   const modes = {listen:{total:0,correct:0,wrong:0,assisted:0},spell:{total:0,correct:0,wrong:0,assisted:0}};
   for (const e of [...data.attempts].sort((a,b) => a.ts-b.ts)) {
     const id=norm(e.word), w=get(id), t=w[e.mode], m=modes[e.mode];
@@ -793,7 +799,7 @@ function allStats() {
     } else {
       t.wrong++; m.wrong++; w.everWrong=true; w.errors++; w.lastWrong=Math.max(w.lastWrong,e.ts); t.stage=0; t.due=e.ts+10*60000;
     }
-    if (e.mode === 'listen') for (const key of e.setKeys) if (progress[key]) progress[key].add(id);
+    if(e.mode==='listen')practicedWords.add(id);
   }
   const wrongWords=[...perWord.values()].filter(w => w.everWrong);
   const active=wrongWords.filter(w => !data.wordFlags[w.id]?.archived && (w.listen.stage<3 || w.spell.stage<3));
@@ -802,7 +808,13 @@ function allStats() {
   const correct=data.legacy.stats.correct+data.attempts.filter(e => e.correct).length;
   const wrong=data.legacy.stats.wrong+data.attempts.filter(e => !e.correct).length;
   let completed=0; const uniqueDone=new Set();
-  for (const [key, list] of Object.entries(WORDS_DATA)) for (const w of list) if (progress[key].has(norm(w.w))) { completed++;uniqueDone.add(norm(w.w)); }
+  // A spelling practiced in any bank counts in every bank containing it.
+  // Derive this from history so existing saves also synchronize without rewriting attempts.
+  for(const [key,list] of Object.entries(WORDS_DATA))for(const word of list) {
+    const id=norm(word.w);
+    if(practicedWords.has(id)){progress[key].add(id);uniqueDone.add(id);}
+  }
+  completed=Object.values(progress).reduce((total,words)=>total+words.size,0);
   return {perWord,progress,modes,wrongWords,active,due,total,correct,wrong,completed,uniqueDone};
 }
 function isRight(input,word) {
@@ -910,7 +922,7 @@ function renderDashboard() {
     ${pending?`<div class="library-resume"><div><strong>上次的练习</strong><p>${modeLabel(data.session.mode)} · 已答 ${data.session.index+(data.session.answered?1:0)} / ${data.session.items.length} 词</p></div><button class="btn primary" data-action="resume">继续练习</button></div>`:''}
     <fieldset class="library-picker"><legend class="sr-only">选择词库</legend><div class="library-columns" aria-hidden="true"><span>跨年汇总</span><span>已练 / 去重词数</span></div>
       ${row('All_Part1')}${row('All_Part4')}
-      <details class="library-more" ${librarySelection.startsWith('All_')?'':'open'}><summary>按年份或剑桥选词</summary><div class="library-columns" aria-hidden="true"><span>原年份词表</span><span>已练 / 词数</span></div>${YEAR_BANK_KEYS.map(row).join('')}<div class="library-columns" aria-hidden="true"><span>新增：剑桥 8–21 · 56 套</span><span>已练 / 去重词数</span></div>${['Cambridge_Part1','Cambridge_Part4'].map(row).join('')}</details>
+      <details class="library-more" ${librarySelection.startsWith('All_')?'':'open'}><summary>按年份或剑桥选词</summary><div class="library-columns" aria-hidden="true"><span>原年份词表</span><span>已练 / 词数</span></div>${YEAR_BANK_KEYS.map(row).join('')}<div class="library-columns" aria-hidden="true"><span>剑桥 8–21 · 56 套</span><span>已练 / 去重词数</span></div>${['Cambridge_Part1','Cambridge_Part4'].map(row).join('')}</details>
     </fieldset>
     <div class="library-options"><label>每组 <select id="practice-limit" name="practice-limit" aria-label="每组词数">${[10,20,50].map(n=>`<option value="${n}" ${n===libraryLimit?'selected':''}>${n} 词</option>`).join('')}</select></label><label><input type="checkbox" id="only-unseen" ${libraryScope==='untouched'?'checked':''}>只练未做过的</label></div>
     <div hidden>${Object.keys(WORDS_DATA).map(key=>`<input type="checkbox" name="practice-set" value="${key}">`).join('')}<select id="practice-scope" name="practice-scope"><option value="untouched">未练</option><option value="all">全部</option></select><select id="practice-order" name="practice-order"><option value="priority">高频优先</option></select></div>
