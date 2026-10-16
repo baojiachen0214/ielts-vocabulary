@@ -794,14 +794,10 @@ function allStats() {
     return perWord.get(id);
   }
   for (const id of Object.keys(data.legacy.wrongBook)) get(id);
-  const progress = {},practicedWords=new Set();
-  for (const key of Object.keys(WORDS_DATA)) {
-    progress[key]=new Set();
-    for(const word of data.legacy.progress[key]?.done||[]) {
-      const id=norm(word);
-      if(BANK_INDEX.get(key)?.has(id))practicedWords.add(id);
-    }
-  }
+  const progress = {},practicedWords=new Set(Object.keys(data.legacy.wrongBook).map(norm));
+  for(const key of Object.keys(WORDS_DATA))progress[key]=new Set();
+  // A prior answer is evidence of practice regardless of its old source-bank key.
+  for(const entry of Object.values(data.legacy.progress))for(const word of entry?.done||[])practicedWords.add(norm(word));
   const modes = {listen:{total:0,correct:0,wrong:0,assisted:0},spell:{total:0,correct:0,wrong:0,assisted:0}};
   for (const e of [...data.attempts].sort((a,b) => a.ts-b.ts)) {
     const id=norm(e.word), w=get(id), t=w[e.mode], m=modes[e.mode];
@@ -816,7 +812,7 @@ function allStats() {
     } else {
       t.wrong++; m.wrong++; w.everWrong=true; w.errors++; w.lastWrong=Math.max(w.lastWrong,e.ts); const errorDay=e.localDay||localDay(e.ts);w.wrongDays[errorDay]=(w.wrongDays[errorDay]||0)+1; t.stage=0; t.due=e.ts+10*60000;
     }
-    if(e.mode==='listen')practicedWords.add(id);
+    practicedWords.add(id);
   }
   const wrongWords=[...perWord.values()].filter(w => w.everWrong);
   const active=wrongWords.filter(w => !data.wordFlags[w.id]?.archived && (w.listen.stage<3 || w.spell.stage<3));
@@ -958,7 +954,7 @@ function renderDashboard() {
     preloadFirstAudio(key,libraryScope);
   };
   for(const radio of root.querySelectorAll('input[name="library-bank"]'))radio.addEventListener('change',()=>{
-    librarySelection=radio.value;libraryScope=counts[librarySelection]===bankWords(librarySelection).length?'all':'untouched';update();
+    librarySelection=radio.value;update();
   });
   $('only-unseen').addEventListener('change',e=>{libraryScope=e.target.checked?'untouched':'all';update();});
   $('practice-limit').addEventListener('change',e=>{libraryLimit=Number(e.target.value);update();});
