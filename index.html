@@ -523,20 +523,32 @@ for (const [key, words] of Object.entries(WORDS_DATA)) for (const w of words) {
 }
 // Aggregate choices are views over real source lists, never duplicate storage keys.
 const YEAR_BANK_KEYS=Object.keys(WORDS_DATA).filter(key=>/^20\d\d_Part[14]$/.test(key));
-const AGGREGATE_BANKS={All_Part1:YEAR_BANK_KEYS.filter(key=>key.endsWith('_Part1')),All_Part4:YEAR_BANK_KEYS.filter(key=>key.endsWith('_Part4'))};
+const AGGREGATE_BANKS={All_Part1:YEAR_BANK_KEYS.filter(key=>key.endsWith('_Part1')),All_Part4:YEAR_BANK_KEYS.filter(key=>key.endsWith('_Part4')),All_Years:YEAR_BANK_KEYS,All_Complete:Object.keys(WORDS_DATA)};
 const BANK_INDEX=new Map(Object.entries(WORDS_DATA).map(([key,list])=>[key,new Map(list.map(word=>[norm(word.w),word]))]));
 const BANK_WORD_CACHE=new Map();
 function bankSourceKeys(key) { return AGGREGATE_BANKS[key]||[key]; }
-function bankFrequency(word,key) { return bankSourceKeys(key).reduce((n,source)=>n+int(BANK_INDEX.get(source)?.get(word.id)?.f),0); }
+function bankFrequency(word,key) { return (key==='All_Complete'?YEAR_BANK_KEYS:bankSourceKeys(key)).reduce((n,source)=>n+int(BANK_INDEX.get(source)?.get(word.id)?.f),0); }
+function bankCompare(a,b,key) {
+  const frequency=bankFrequency(b,key)-bankFrequency(a,key);
+  if(frequency)return frequency;
+  if(key==='All_Complete') {
+    const cambridgeFrequency=word=>new Set(word.sources.map(source=>source.paperId)).size;
+    const difference=cambridgeFrequency(b)-cambridgeFrequency(a);
+    if(difference)return difference;
+  }
+  return a.id.localeCompare(b.id,'en');
+}
 function bankWords(key) {
   if(!BANK_WORD_CACHE.has(key)) {
     const keys=bankSourceKeys(key);
-    BANK_WORD_CACHE.set(key,[...records.values()].filter(w=>w.sets.some(source=>keys.includes(source))).sort((a,b)=>bankFrequency(b,key)-bankFrequency(a,key)||a.id.localeCompare(b.id,'en')));
+    BANK_WORD_CACHE.set(key,[...records.values()].filter(w=>w.sets.some(source=>keys.includes(source))).sort((a,b)=>bankCompare(a,b,key)));
   }
   return BANK_WORD_CACHE.get(key);
 }
 function bankWordDone(word,key,stats) { return bankSourceKeys(key).some(source=>stats.progress[source]?.has(word.id)); }
 function bankLabel(key) {
+  if(key==='All_Years')return '2024–2026 综合去重 · Part 1 + Part 4';
+  if(key==='All_Complete')return '全部词库综合去重 · 年份词表与剑桥';
   if(key.startsWith('All_'))return '2024–2026 汇总 · '+key.replace('All_Part','Part ');
   if(key.startsWith('Cambridge_'))return '剑桥 8–21 · '+key.replace('Cambridge_Part','Part ');
   return setLabel(key);
@@ -911,22 +923,22 @@ function bars(entries,color='') {
 function renderDashboard() {
   const stats=allStats();
   if(!AGGREGATE_BANKS[librarySelection]&&!WORDS_DATA[librarySelection])librarySelection='All_Part1';
-  const allKeys=['All_Part1','All_Part4',...Object.keys(WORDS_DATA)];
+  const allKeys=[...Object.keys(AGGREGATE_BANKS),...Object.keys(WORDS_DATA)];
   const counts=Object.fromEntries(allKeys.map(key=>[key,bankWords(key).filter(word=>bankWordDone(word,key,stats)).length]));
   const pending=data.session&&data.session.index<data.session.items.length;
   const today=data.attempts.filter(e=>e.localDay===localDay()).length;
   const completed=stats.uniqueDone.size,percent=Math.floor(completed/ORIGINAL_UNIQUE*100);
   const row=key=>{
     const total=bankWords(key).length,done=counts[key],aggregate=key.startsWith('All_'),cambridge=key.startsWith('Cambridge_');
-    const title=aggregate||cambridge?'Part '+key.slice(-1):key.slice(0,4);
-    const subtitle=aggregate?'2024–2026 去重':cambridge?'剑桥 8–21 答案':'Part '+key.slice(-1);
+    const title=key==='All_Years'?'综合':key==='All_Complete'?'全部':aggregate||cambridge?'Part '+key.slice(-1):key.slice(0,4);
+    const subtitle=key==='All_Years'?'2024–2026 · Part 1 + 4':key==='All_Complete'?'年份 + 剑桥 · 综合去重':aggregate?'2024–2026 去重':cambridge?'剑桥 8–21 答案':'Part '+key.slice(-1);
     return `<label class="library-row"><input type="radio" name="library-bank" value="${escapeHTML(key)}" ${key===librarySelection?'checked':''} aria-label="${escapeHTML(bankLabel(key))}，已练 ${done} / ${total} 词"><span class="library-name"><strong>${title}</strong><span>${subtitle}</span></span><span class="library-row-track" aria-hidden="true"><span style="width:${done/total*100}%"></span></span><span class="library-count"><b>${done}</b> / ${total}</span></label>`;
   };
   $('view-dashboard').innerHTML=`<div class="sheet-head"><h1>词库</h1>${today?`<p>今天作答 ${today} 次</p>`:''}</div>
     <div class="library-total"><div class="library-total-label"><span>已练 <strong>${completed}</strong> / ${ORIGINAL_UNIQUE} 个不同单词</span><span>${percent}%</span></div><div class="library-total-track" role="progressbar" aria-label="不同单词已练进度" aria-valuemin="0" aria-valuemax="${ORIGINAL_UNIQUE}" aria-valuenow="${completed}"><span style="width:${completed/ORIGINAL_UNIQUE*100}%"></span></div></div>
     ${pending?`<div class="library-resume"><div><strong>上次的练习</strong><p>${modeLabel(data.session.mode)} · 已答 ${data.session.index+(data.session.answered?1:0)} / ${data.session.items.length} 词</p></div><button class="btn primary" data-action="resume">继续练习</button></div>`:''}
     <fieldset class="library-picker"><legend class="sr-only">选择词库</legend><div class="library-columns" aria-hidden="true"><span>跨年汇总</span><span>已练 / 去重词数</span></div>
-      ${row('All_Part1')}${row('All_Part4')}
+      ${row('All_Part1')}${row('All_Part4')}${row('All_Years')}${row('All_Complete')}
       <details class="library-more" ${librarySelection.startsWith('All_')?'':'open'}><summary>按年份或剑桥选词</summary><div class="library-columns" aria-hidden="true"><span>原年份词表</span><span>已练 / 词数</span></div>${YEAR_BANK_KEYS.map(row).join('')}<div class="library-columns" aria-hidden="true"><span>剑桥 8–21 · 56 套</span><span>已练 / 去重词数</span></div>${['Cambridge_Part1','Cambridge_Part4'].map(row).join('')}</details>
     </fieldset>
     <div class="library-options"><label>每组 <select id="practice-limit" name="practice-limit" aria-label="每组词数">${[10,20,50].map(n=>`<option value="${n}" ${n===libraryLimit?'selected':''}>${n} 词</option>`).join('')}</select></label><label><input type="checkbox" id="only-unseen" ${libraryScope==='untouched'?'checked':''}>只练未做过的</label></div>
@@ -942,7 +954,7 @@ function renderDashboard() {
     $('practice-scope').value=libraryScope;$('only-unseen').checked=libraryScope==='untouched';
     $('library-start-info').textContent=remaining?`高频优先 · 本次 ${Math.min(libraryLimit,remaining)} 词`:'已练完。可选其他词库，或取消勾选重练。';
     $('library-start').disabled=!remaining;
-    $('library-frequency-note').textContent=key.startsWith('Cambridge_')?'频次按不同套题计数；剑桥册号不等于考试年份。':'频次沿用原年份词表；跨年汇总相加，同一拼写只出一题。';
+    $('library-frequency-note').textContent=key==='All_Complete'?'收录现有 Part 1、Part 4 全部词汇。年份词频优先，同频按剑桥套题频次排序，两种频次不相加。':key.startsWith('Cambridge_')?'频次按不同套题计数；剑桥册号不等于考试年份。':'频次沿用原年份词表；跨年汇总相加，同一拼写只出一题。';
     preloadFirstAudio(key,libraryScope);
   };
   for(const radio of root.querySelectorAll('input[name="library-bank"]'))radio.addEventListener('change',()=>{
@@ -1024,7 +1036,7 @@ function startPractice(mode,singleId=null) {
   if(order==='random')for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}
   else if(order==='recent')list.sort((a,b)=>(s.perWord.get(b.id)?.lastWrong||0)-(s.perWord.get(a.id)?.lastWrong||0)||a.id.localeCompare(b.id));
   else if(scope==='active'||scope==='wrong'||scope==='due'||mode==='spell')list.sort((a,b)=>{const x=s.perWord.get(a.id),y=s.perWord.get(b.id);return ((y?.legacyWrong||0)+(y?.errors||0))-((x?.legacyWrong||0)+(x?.errors||0));});
-  if(mode==='listen'&&bank&&order==='priority')list.sort((a,b)=>bankFrequency(b,bank)-bankFrequency(a,bank)||a.id.localeCompare(b.id,'en'));
+  if(mode==='listen'&&bank&&order==='priority')list.sort((a,b)=>bankCompare(a,b,bank));
   if(limit)list=list.slice(0,limit);
   if(!list.length&&view==='wrong'){toast(wrongFilter.day==='done'?'今天还没有复习过的错词。':'这个范围今天已复习完，可切换到「今天已复习 · 重练」。');return;}
   if(!list.length){toast(scope==='due'?'暂时没有到期错词，可以改选「全部错词」。':'这个范围已经练完了，试试其他词库或选择「全部单词」。');return;}
